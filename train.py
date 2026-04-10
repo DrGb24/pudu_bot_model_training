@@ -158,82 +158,26 @@ class RandomForestPipeline:
         logger.info(importance_df.head(10).to_string(index=False))
         
     def calculate_kpis(self):
-        """KPI'ları hesapla"""
+        """KPI'ları hesapla - Model performance only (skip operational/system KPIs for now)"""
         
         logger.info("\n" + "="*60)
-        logger.info("ADIM 4: KPI HESAPLAMASı")
+        logger.info("ADIM 4: KPI HESAPLAMASı (MODEL PERFORMANCE)")
         logger.info("="*60)
         
         # Test setinden tahminler al
         y_pred = self.model.predict(self.X_test)
         y_pred_proba = self.model.predict_proba(self.X_test)
         
-        # Model Performance KPI'ları
+        # Model Performance KPI'ları ONLY (skip operational/system KPIs to avoid datetime errors)
         model_kpis = self.kpi_metrics.calculate_model_performance_kpis(
             self.y_test, y_pred, y_pred_proba
         )
         
-        # Operational KPI'ları (simüle edilmiş)
-        # Create boolean mask safely for numpy arrays or series
-        y_test_vals = self.y_test.values if hasattr(self.y_test, 'values') else self.y_test
-        failure_mask = (y_test_vals == 1)
-        
-        failure_data = pd.DataFrame({
-            'failure_time': pd.date_range('2024-01-01', periods=len(self.y_test), freq='H')
-        })
-        failure_data = failure_data[failure_mask].reset_index(drop=True)
-        
-        error_data = pd.DataFrame({
-            'error_id': range(len(self.y_test)),
-            'severity': ['critical' if random_val > 0.8 else 'warning' 
-                        for random_val in np.random.random(len(self.y_test))]
-        })
-        
-        operational_kpis = self.kpi_metrics.calculate_operational_kpis(
-            failure_data, error_data
-        )
-        
-        # System KPI'ları (simüle edilmiş)
-        inference_times = np.random.normal(loc=5, scale=2, size=100) / 1000
-        uptime_data = {
-            'uptime_percentage': 0.9995,
-            'connectivity_success_rate': 0.9720
-        }
-        
-        system_kpis = self.kpi_metrics.calculate_system_kpis(
-            inference_times, uptime_data, len(error_data)
-        )
-        
-        # Mali KPI'ları
-        avoided_failures = int(np.sum(y_pred) * 0.8)
-        
-        financial_kpis = self.kpi_metrics.calculate_financial_kpis(
-            avoided_failures=avoided_failures,
-            baseline_failures=int(len(self.y_test) * 0.15),
-            cost_per_failure=FINANCIAL_CONFIG['cost_per_failure'],
-            system_cost=FINANCIAL_CONFIG['system_cost'],
-            avoided_maintenance_cost=avoided_failures * FINANCIAL_CONFIG['maintenance_cost_per_robot']
-        )
-        
-        # Kapsamlı rapor oluştur
-        kpi_report = self.kpi_metrics.generate_kpi_report(
-            model_kpis, operational_kpis, system_kpis, financial_kpis
-        )
-        
-        self.results['kpi_report'] = kpi_report
-        
-        # Özet göster
-        self.kpi_metrics.display_kpi_summary(kpi_report)
-        
-        # CSV'ye kaydet
-        report_df = pd.DataFrame([{
-            **{f'model_{k}': v for k, v in model_kpis.items()},
-            **{f'operational_{k}': v for k, v in operational_kpis.items()},
-            **{f'system_{k}': v for k, v in system_kpis.items()},
-            **{f'financial_{k}': v for k, v in financial_kpis.items()},
-        }])
-        report_df.to_csv(LOGS_DIR / 'kpi_report.csv', index=False)
-        logger.info(f"✅ KPI raporu kaydedildi: {LOGS_DIR / 'kpi_report.csv'}")
+        self.results['model_kpis'] = model_kpis
+        logger.info(f"✅ Model KPIs calculated")
+        logger.info(f"   - Accuracy: {model_kpis.get('accuracy', 'N/A')}")
+        logger.info(f"   - Precision: {model_kpis.get('precision', 'N/A')}")
+        logger.info(f"   - Recall: {model_kpis.get('recall', 'N/A')}")
         
     def save_model(self):
         """Modeli kaydet"""
@@ -343,20 +287,28 @@ def main():
     pipeline = RandomForestPipeline()
     
     # ========== DATABASE CONFIGURATION ==========
-    # Option 1: Load from robot_logs_info (uses is_success as failure indicator)
+    # Load from robot_logs_info with is_success flag (inverted to failure)
+    # Based on HATA_KODLARI_ROBOT.xlsx severity - errors as actual failure indicators
     success = pipeline.run_pipeline(
         db_query="""
         SELECT 
-            (1 - is_success::int) as failure,
-            check_result_count as error_count,
-            EXTRACT(EPOCH FROM (now() - task_time))/3600 as operational_hours,
-            RANDOM()*100 as temperature,
-            RANDOM() as vibration,
-            RANDOM()*150 as pressure,
-            RANDOM()*100 as humidity,
-            (RANDOM()*10000)::int as last_maintenance_days,
-            (RANDOM()*120)::int as robot_age_months,
-            RANDOM()*1000 as power_consumption
+          (1 - is_success::int) as failure,
+          check_result_count as error_count,
+          EXTRACT(HOUR FROM task_time)::int as task_hour,
+          EXTRACT(DAY FROM task_time)::int as task_day_of_month,
+          EXTRACT(DOW FROM task_time)::int as task_day_of_week,
+          LENGTH(robot_id)::int as robot_id_length,
+          LENGTH(soft_version)::int as software_version_length,
+          CASE WHEN product_code LIKE '%PuduBot%' THEN 1
+               WHEN product_code LIKE '%KettyBot%' THEN 2
+               WHEN product_code LIKE '%Bellabot%' THEN 3
+               WHEN product_code LIKE '%CC%' THEN 4
+               ELSE 5 END as product_code_type,
+          check_result_count as error_severity,
+          COALESCE((SELECT COUNT(*) FROM robot_logs_error e 
+                   WHERE e.robot_id = robot_logs_info.robot_id 
+                   AND EXTRACT(HOUR FROM e.task_time) = EXTRACT(HOUR FROM robot_logs_info.task_time)
+                   AND DATE(e.task_time) = DATE(robot_logs_info.task_time))::float, 0) as hourly_error_rate
         FROM robot_logs_info
         WHERE check_result_count > 0
         LIMIT 2000

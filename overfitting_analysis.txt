@@ -1,0 +1,20 @@
+======================================================================
+OVERFITTING ANALÝZÝ - %100 Accuracy Doðrulamasý
+======================================================================
+Traceback (most recent call last):
+  File "C:\Users\PC1\OneDrive\Desktop\project\check_overfitting.py", line 22, in <module>
+    print("\n1\ufe0f\u20e3 VERÝ YÜKLENÝYOR...")
+  File "C:\Users\PC1\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1254.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode characters in position 3-4: character maps to <undefined>
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\PC1\OneDrive\Desktop\project\check_overfitting.py", line 217, in <module>
+    print(f"\u274c Hata: {str(e)}")
+  File "C:\Users\PC1\AppData\Local\Programs\Python\Python311\Lib\encodings\cp1254.py", line 19, in encode
+    return codecs.charmap_encode(input,self.errors,encoding_table)[0]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+UnicodeEncodeError: 'charmap' codec can't encode character '\u274c' in position 0: character maps to <undefined>

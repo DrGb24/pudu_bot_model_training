@@ -29,9 +29,15 @@ DATA_CONFIG = {
     'target_column': 'failure',
     'categorical_columns': [],
     'numerical_columns': [
-        'temperature', 'vibration', 'pressure', 'humidity',
-        'operational_hours', 'error_count', 'last_maintenance_days',
-        'robot_age_months', 'power_consumption'
+        'error_count',
+        'task_hour',
+        'task_day_of_month',
+        'task_day_of_week',
+        'robot_id_length',
+        'software_version_length',
+        'product_code_type',
+        'error_severity',
+        'hourly_error_rate'
     ],
 }
 

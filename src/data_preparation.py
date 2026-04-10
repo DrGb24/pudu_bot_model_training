@@ -256,9 +256,10 @@ class DataPreparation:
         if categorical_cols:
             df = self.encode_categorical_features(df, categorical_cols)
         
-        # Remove outliers from numerical columns
-        if numerical_cols:
-            df = self.remove_outliers(df, numerical_cols)
+        # Note: Outlier removal disabled for bounded integer features (task_hour, task_day, etc)
+        # These features have limited ranges (0-23 for hour, 0-31 for day) where z-score outlier detection fails
+        # if numerical_cols:
+        #     df = self.remove_outliers(df, numerical_cols, threshold=10)
         
         # Prepare features and target
         self.target_column = target_column

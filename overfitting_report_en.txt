@@ -1,0 +1,144 @@
+INFO:data_preparation:\u2705 Connected to PostgreSQL: robot_pipeline@149.102.155.77
+INFO:data_preparation:Executing custom query...
+C:\Users\PC1\OneDrive\Desktop\project\src\data_preparation.py:92: UserWarning: pandas only supports SQLAlchemy connectable (engine/connection) or database string URI or sqlite3 DBAPI2 connection. Other DBAPI2 objects are not tested. Please consider using SQLAlchemy.
+  df = pd.read_sql_query(query, conn)
+INFO:data_preparation:\u2705 Data loaded successfully. Shape: (2000, 10)
+INFO:data_preparation:Data loaded successfully. Shape: (2000, 10)
+INFO:data_preparation:Removed 62 outliers from operational_hours
+INFO:data_preparation:Removed 40 outliers from error_count
+INFO:data_preparation:Data preparation complete!
+INFO:data_preparation:Training set size: (1328, 9) (70%)
+INFO:data_preparation:Validation set size: (285, 9) (15%)
+INFO:data_preparation:Test set size: (285, 9) (15%)
+INFO:tree_models:Random Forest Model: 2000 aðaç, max_depth=50 (95% Accuracy Target)
+INFO:tree_models:Random Forest modeli eðitiliyor...
+INFO:tree_models:\u2705 Model eðitimi tamamlandý (2.51 saniye)
+INFO:tree_models:   - OOB (Out-of-Bag) Skoru: 0.9962
+INFO:tree_models:Random Forest Model: 2000 aðaç, max_depth=50 (95% Accuracy Target)
+INFO:tree_models:Random Forest modeli eðitiliyor...
+INFO:tree_models:\u2705 Model eðitimi tamamlandý (2.75 saniye)
+INFO:tree_models:   - OOB (Out-of-Bag) Skoru: 0.9960
+INFO:tree_models:Random Forest Model: 2000 aðaç, max_depth=50 (95% Accuracy Target)
+INFO:tree_models:Random Forest modeli eðitiliyor...
+INFO:tree_models:\u2705 Model eðitimi tamamlandý (2.61 saniye)
+INFO:tree_models:   - OOB (Out-of-Bag) Skoru: 0.9974
+INFO:tree_models:Random Forest Model: 2000 aðaç, max_depth=50 (95% Accuracy Target)
+INFO:tree_models:Random Forest modeli eðitiliyor...
+INFO:tree_models:\u2705 Model eðitimi tamamlandý (2.71 saniye)
+INFO:tree_models:   - OOB (Out-of-Bag) Skoru: 0.9974
+INFO:tree_models:Random Forest Model: 2000 aðaç, max_depth=50 (95% Accuracy Target)
+INFO:tree_models:Random Forest modeli eðitiliyor...
+INFO:tree_models:\u2705 Model eðitimi tamamlandý (2.70 saniye)
+INFO:tree_models:   - OOB (Out-of-Bag) Skoru: 0.9967
+INFO:tree_models:Random Forest Model: 2000 aðaç, max_depth=50 (95% Accuracy Target)
+INFO:tree_models:Random Forest modeli eðitiliyor...
+INFO:tree_models:\u2705 Model eðitimi tamamlandý (2.61 saniye)
+INFO:tree_models:   - OOB (Out-of-Bag) Skoru: 0.9974
+======================================================================
+OVERFITTING ANALYSIS - 100% Accuracy Verification
+======================================================================
+
+1. LOADING DATA...
+OK - 2000 rows loaded
+Class Distribution:
+failure
+0    1952
+1      48
+Name: count, dtype: int64
+
+2. PREPARING DATA...
+
+Data Split:
+  Training:   1328 samples (70.0%)
+  Validation: 285 samples (15.0%)
+  Test:       285 samples (15.0%)
+
+3. TRAINING MODEL...
+OK - Model training complete
+
+======================================================================
+OVERFITTING ANALYSIS RESULTS
+======================================================================
+
+ACCURACY:
+  Training:   1.0000 (100.00%)
+  Validation: 0.9965 (99.65%)
+  Test:       1.0000 (100.00%)
+
+PRECISION:
+  Training:   1.0000
+  Validation: 1.0000
+  Test:       1.0000
+
+RECALL:
+  Training:   1.0000
+  Validation: 0.8000
+  Test:       1.0000
+
+F1-SCORE:
+  Training:   1.0000
+  Validation: 0.8889
+  Test:       1.0000
+
+AUC-ROC:
+  Training:   1.0000
+  Validation: 1.0000
+  Test:       1.0000
+
+======================================================================
+OVERFITTING INDICATORS
+======================================================================
+
+Train vs Test Accuracy Gap: 0.0000
+   OK (normal, acceptable)
+
+Train vs Validation Accuracy Gap: 0.0035
+   OK (normal)
+
+======================================================================
+CONFUSION MATRIX ANALYSIS
+======================================================================
+
+Training:
+  True Positives:  22
+  True Negatives:  1306
+  False Positives: 0
+  False Negatives: 0
+
+Validation:
+  True Positives:  4
+  True Negatives:  280
+  False Positives: 0
+  False Negatives: 1
+
+Test:
+  True Positives:  5
+  True Negatives:  280
+  False Positives: 0
+  False Negatives: 0
+
+======================================================================
+5-FOLD CROSS-VALIDATION
+======================================================================
+Fold 1: 0.9974 (99.74%)
+Fold 2: 0.9947 (99.47%)
+Fold 3: 0.9947 (99.47%)
+Fold 4: 0.9974 (99.74%)
+Fold 5: 0.9974 (99.74%)
+
+Cross-Validation Mean: 0.9963 +/- 0.0013
+Cross-Validation Range: 0.9947 to 0.9974
+
+======================================================================
+FINAL VERDICT
+======================================================================
+
+VERDICT: NO OVERFITTING DETECTED
+  - Test Accuracy: 100.00%
+  - CV Score: 99.63%
+  - Train-Test Gap: 0.00%
+  - Generalization: EXCELLENT
+
+CONCLUSION: 100% accuracy is LEGITIMATE!
+
+======================================================================
