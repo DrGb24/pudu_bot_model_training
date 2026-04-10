@@ -1,103 +1,94 @@
 """
 Quick Start Guide - Example Usage of Predictive Maintenance System
 
-This file demonstrates how to use different components of the system.
+IMPORTANT: Synthetic data is DISABLED. All examples use PostgreSQL database.
+Database connection is required to run these examples.
+
+This file demonstrates how to use different components of the system with real database data.
 Run sections individually to explore the system.
 """
 
+# Database Configuration
+DATABASE_CONFIG = {
+    'type': 'postgresql',
+    'host': '149.102.155.77',
+    'port': 5433,
+    'database': 'robot_pipeline',
+    'user': 'robot_pipeline_admin',
+    'password': 'RobotPipe!2026#PG!149',
+    'ssl_mode': 'disable',
+}
+
 # ============================================================================
-# EXAMPLE 1: Basic Data Preparation
+# EXAMPLE 1: Load Data from PostgreSQL Database
 # ============================================================================
 
-def example_1_data_preparation():
-    """Load and prepare data"""
+def example_1_load_database():
+    """Load and prepare data from PostgreSQL (Database Required)"""
     
-    from src.data_preparation import DataPreparation, create_synthetic_data
+    from src.data_preparation import DataPreparation
     import pandas as pd
     
-    # Create synthetic data
-    print("Creating synthetic maintenance data...")
-    df = create_synthetic_data(n_samples=1000)
-    print(f"Created data with shape: {df.shape}")
-    print(f"\nTarget distribution:\n{df['failure'].value_counts()}")
-    
-    # Prepare data
-    print("\nPreparing data for training...")
+    print("Loading data from PostgreSQL database...")
     data_prep = DataPreparation(random_state=42)
     
-    X_train, X_test, y_train, y_test, features = data_prep.prepare_data(
-        filepath='data/synthetic_maintenance_data.csv',
-        target_column='failure',
-        numerical_cols=['temperature', 'vibration', 'pressure', 'humidity',
-                       'operational_hours', 'error_count', 'last_maintenance_days',
-                       'robot_age_months', 'power_consumption'],
-        test_size=0.2
-    )
-    
-    print(f"\nTraining set: {X_train.shape}")
-    print(f"Test set: {X_test.shape}")
-    print(f"Features: {features}")
-    
-    return X_train, X_test, y_train, y_test, features
+    try:
+        # Load from database table
+        df = data_prep.load_from_database(
+            db_config=DATABASE_CONFIG,
+            table_name='robots_data'  # Change table name as needed
+        )
+        
+        print(f"✅ Data loaded successfully: {df.shape[0]} samples")
+        print(f"\nColumns: {list(df.columns)}")
+        print(f"\nTarget distribution:\n{df['failure'].value_counts()}")
+        
+        return df
+        
+    except Exception as e:
+        print(f"❌ Failed to load data from database: {str(e)}")
+        print("Please check database configuration in DATABASE_CONFIG")
+        raise
 
 
 # ============================================================================
-# EXAMPLE 2: Train Individual Models
+# EXAMPLE 2: Prepare Data with Validation Set
 # ============================================================================
 
-def example_2_train_models():
-    """Train specific tree-based models"""
+def example_2_prepare_data():
+    """Prepare data from database with train/validation/test split (70/15/15)"""
     
-    from src.tree_models import TreeBasedModels
-    from src.data_preparation import create_synthetic_data, DataPreparation
+    from src.data_preparation import DataPreparation
     
-    # Prepare data first
-    print("Preparing data...")
-    df = create_synthetic_data(n_samples=1000)
-    df.to_csv('data/temp_data.csv', index=False)
+    print("Loading and preparing data from PostgreSQL...")
+    data_prep = DataPreparation(random_state=42)
     
-    data_prep = DataPreparation()
-    X_train, X_test, y_train, y_test, features = data_prep.prepare_data(
-        filepath='data/temp_data.csv',
-        target_column='failure',
-        numerical_cols=['temperature', 'vibration', 'pressure', 'humidity',
-                       'operational_hours', 'error_count', 'last_maintenance_days',
-                       'robot_age_months', 'power_consumption'],
-        test_size=0.2
-    )
-    
-    # Train models
-    print("\nTraining models...")
-    models = TreeBasedModels(random_state=42)
-    
-    # Train individual models
-    model_names = ['random_forest', 'gradient_boosting', 'xgboost']
-    
-    for model_name in model_names:
-        print(f"Training {model_name}...")
-        models.train_model(model_name, X_train, y_train, X_test, y_test)
-    
-    # Compare models
-    print("\nComparing models...")
-    comparison = models.compare_models(X_test, y_test)
-    print(comparison)
-    
-    # Get best model
-    best_model, metrics = models.get_best_model(X_test, y_test)
-    print(f"\nBest Model: {best_model}")
-    print(f"Metrics:\n{metrics}")
-    
-    return models, X_test, y_test, features
-
-
-# ============================================================================
-# EXAMPLE 3: Calculate KPIs
-# ============================================================================
-
-def example_3_calculate_kpis():
-    """Calculate performance KPIs"""
-    
-    from src.kpi_metrics import KPIMetrics
+    try:
+        # Load from database
+        df = data_prep.load_from_database(
+            db_config=DATABASE_CONFIG,
+            table_name='robots_data'
+        )
+        
+        # Save to temporary CSV for preprocessing
+        df.to_csv('data/temp_db_data.csv', index=False)
+        
+        # Prepare data with validation set
+        X_train, X_val, X_test, y_train, y_val, y_test, features = data_prep.prepare_data(
+            filepath='data/temp_db_data.csv',
+            target_column='failure',
+            numerical_cols=['temperature', 'vibration', 'pressure', 'humidity',
+                           'operational_hours', 'error_count', 'last_maintenance_days',
+                           'robot_age_months', 'power_consumption'],
+            validation_size=0.15,
+            return_validation=True
+        )
+        
+        print(f"✅ Data preparation complete")
+        print(f"   Training set: {X_train.shape[0]} samples (70%)")
+        print(f"   Validation set: {X_val.shape[0]} samples (15%)")
+        print(f"   Test set: {X_test.shape[0]} samples (15%)")
+        print(f"   Features: {len(features)}")
     from src.tree_models import TreeBasedModels
     from src.data_preparation import create_synthetic_data, DataPreparation
     import pandas as pd

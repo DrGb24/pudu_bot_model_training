@@ -48,68 +48,62 @@ class RandomForestPipeline:
         self.feature_names = None
         self.results = {}
         
-    def prepare_data(self, data_source='synthetic', db_table=None, db_query=None):
+    def prepare_data(self, db_table=None, db_query=None):
         """
-        Load and prepare data
+        Load and prepare data from PostgreSQL database (MANDATORY)
         
         Parameters:
-        - data_source: 'synthetic', 'csv', or 'postgresql'
-        - db_table: Table name (for postgresql)
-        - db_query: Custom SQL query (for postgresql)
+        - db_table: Table name to load from database
+        - db_query: Custom SQL query (optional alternative to table name)
+        
+        Raises:
+        - ValueError: If neither db_table nor db_query provided
+        - RuntimeError: If PostgreSQL connection fails (no fallback allowed)
         """
         
         logger.info("="*60)
-        logger.info("ADIM 1: VERİ HAZIRLAMASI")
+        logger.info("ADIM 1: VERİ HAZIRLAMASI (DATABASE REQUIRED)")
         logger.info("="*60)
         
+        # Validate input
+        if not db_table and not db_query:
+            logger.error("❌ CRITICAL: Neither db_table nor db_query provided")
+            raise ValueError(
+                "❌ Database configuration required! Provide either 'db_table' or 'db_query'. "
+                "Synthetic data is DISABLED - database connection is mandatory."
+            )
+        
+        logger.info("🔌 Loading data from PostgreSQL database...")
         df = None
         data_file = None
         
-        if data_source == 'synthetic':
-            logger.info("📊 Creating synthetic data...")
-            df = create_synthetic_data(n_samples=2000)
-            data_file = DATA_DIR / 'synthetic_maintenance_data.csv'
+        try:
+            if db_table:
+                logger.info(f"📋 Table: {db_table}")
+                df = self.data_prep.load_from_database(DATABASE_CONFIG, table_name=db_table)
+            else:
+                logger.info(f"🔍 Executing custom SQL query...")
+                df = self.data_prep.load_from_database(DATABASE_CONFIG, query=db_query)
+            
+            if df is None or len(df) == 0:
+                raise ValueError("Database query returned empty result set")
+            
+            logger.info(f"✅ PostgreSQL data loaded successfully: {df.shape[0]} samples")
+            
+            # Archive data snapshot for audit trail
+            data_file = DATA_DIR / 'database_snapshot.csv'
             df.to_csv(data_file, index=False)
-            logger.info(f"✅ Synthetic data created: {df.shape[0]} samples")
-            
-        elif data_source == 'csv':
-            # Load from existing CSV file
-            data_file = DATA_DIR / 'maintenance_data.csv'
-            if not data_file.exists():
-                raise FileNotFoundError(f"Data file not found: {data_file}")
-            df = pd.read_csv(data_file)
-            logger.info(f"✅ CSV data loaded: {df.shape[0]} samples")
-            
-        elif data_source == 'postgresql':
-            logger.info("🔌 Loading data from PostgreSQL...")
-            
-            if not db_table and not db_query:
-                raise ValueError("For postgresql, provide either 'db_table' or 'db_query'")
-            
-            try:
-                if db_table:
-                    logger.info(f"📋 Table: {db_table}")
-                    df = self.data_prep.load_from_database(DATABASE_CONFIG, table_name=db_table)
-                else:
-                    logger.info(f"🔍 Executing custom SQL query...")
-                    df = self.data_prep.load_from_database(DATABASE_CONFIG, query=db_query)
+            logger.info(f"💾 Data snapshot saved for audit: {data_file}")
                 
-                logger.info(f"✅ PostgreSQL data loaded: {df.shape[0]} samples")
-                
-                # Save to CSV for future reference
-                data_file = DATA_DIR / 'postgresql_maintenance_data.csv'
-                df.to_csv(data_file, index=False)
-                logger.info(f"💾 Data saved to: {data_file}")
-                
-            except Exception as e:
-                logger.error(f"❌ PostgreSQL connection failed: {e}")
-                logger.info("⚠️  Falling back to synthetic data...")
-                df = create_synthetic_data(n_samples=2000)
-                data_file = DATA_DIR / 'synthetic_maintenance_data.csv'
-                df.to_csv(data_file, index=False)
-        
-        else:
-            raise ValueError(f"Unknown data_source: {data_source}")
+        except Exception as e:
+            logger.error(f"❌ CRITICAL DATABASE ERROR: {str(e)}")
+            logger.error("❌ Synthetic data fallback is DISABLED per project policy")
+            logger.error("⚠️  Database configuration: Please check src/config.py")
+            raise RuntimeError(
+                f"Failed to load data from PostgreSQL database. "
+                f"Synthetic data fallback is disabled. "
+                f"Please verify database connection. Original error: {str(e)}"
+            )
         
         # Show data info
         logger.info(f"\n📊 Data Info:")
@@ -294,23 +288,24 @@ class RandomForestPipeline:
         logger.info(f"   Modeller: {MODELS_DIR}")
         logger.info(f"   Loglar:   {LOGS_DIR}")
         
-    def run_pipeline(self, data_source='synthetic', db_table=None, db_query=None):
+    def run_pipeline(self, db_table=None, db_query=None):
         """
-        Pipeline'ı çalıştır
+        Training Pipeline - PostgreSQL Database Required
         
         Parameters:
-        - data_source: 'synthetic', 'csv', or 'postgresql'
-        - db_table: Table name (for postgresql)
-        - db_query: Custom SQL query (for postgresql)
+        - db_table: Table name to load from database (recommended)
+        - db_query: Custom SQL query (optional alternative)
+        
+        NOTE: Synthetic data is DISABLED. Database connection is MANDATORY.
         """
         
         logger.info("\n" + "="*80)
-        logger.info("RANDOM FOREST ARIZA TAHMIN SİSTEMİ")
+        logger.info("RANDOM FOREST ARIZA TAHMIN SİSTEMİ (DATABASE MODE)")
         logger.info("="*80)
         
         try:
-            # Adım 1: Veri Hazırlama
-            self.prepare_data(data_source=data_source, db_table=db_table, db_query=db_query)
+            # Adım 1: PostgreSQL Veri Hazırlama
+            self.prepare_data(db_table=db_table, db_query=db_query)
             
             # Adım 2: Model Eğitimi
             self.train_model()
@@ -339,33 +334,31 @@ class RandomForestPipeline:
 
 
 def main():
-    """Ana girişi - Veri kaynağı seçimi ile"""
+    """Training Pipeline - PostgreSQL Database Required
     
-    # Default: Sentetik veri
-    # Eğer PostgreSQL'i kullanmak istirsen:
+    NOTE: Synthetic data is DISABLED. All training uses PostgreSQL database only.
+    Database connection is MANDATORY for the system to work.
+    """
+    
     pipeline = RandomForestPipeline()
     
-    # ========== VERİ KAYNAĞI SEÇİMİ ==========
-    # 1. SYNTHETTIK VERİ (Default)
-    #success = pipeline.run_pipeline(data_source='synthetic')
-    
-    # 2. PostgreSQL'den VERİ
+    # ========== DATABASE CONFIGURATION ==========
+    # Option 1: Load from table (RECOMMENDED)
     success = pipeline.run_pipeline(
-        data_source='postgresql',
-        db_table='robots_data'  # Tablo adını değiştir
- )
+        db_table='robots_data'  # Change to your table name
+    )
     
-    # 3. PostgreSQL'den CUSTOM SORGU
+    # Option 2: Load with custom SQL query
     # success = pipeline.run_pipeline(
-    #     data_source='postgresql',
     #     db_query="""
     #     SELECT * FROM robots_data 
     #     WHERE failure IN (0, 1)
+    #     ORDER BY timestamp DESC
     #     """
     # )
     
-    # 4. CSV DÖSYASı
-    # success = pipeline.run_pipeline(data_source='csv')
+    # NOTE: Synthetic data fallback is PERMANENTLY DISABLED
+    # Database is MANDATORY - see src/config.py for connection settings
     
     return 0 if success else 1
 

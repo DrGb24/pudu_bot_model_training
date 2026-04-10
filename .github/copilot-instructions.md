@@ -23,9 +23,14 @@ This is a machine learning project for predictive maintenance of industrial robo
 - All Python code follows PEP 8 style guide
 - Models use scikit-learn RandomForestClassifier interface
 - Use RandomForestModel class from src/tree_models.py
-- KPI thresholds defined in src/config.py (accuracy≥0.85, recall≥0.85, precision≥0.80)
+- KPI thresholds defined in src/config.py (accuracy≥0.98, recall≥0.85, precision≥0.80)
 - Log all operations to both file (logs/) and console
 - Use absolute paths from src/config.py for file operations
+- **⚠️ CRITICAL: Synthetic data is PERMANENTLY DISABLED**
+  - All data must come from PostgreSQL database (src/config.py)
+  - Database connection is MANDATORY for training/inference
+  - No fallback to synthetic or CSV data allowed
+  - train.py() requires db_table or db_query parameter
 
 ## Model Architecture
 - **Type**: Random Forest Binary Classifier
