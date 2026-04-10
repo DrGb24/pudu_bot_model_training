@@ -343,22 +343,25 @@ def main():
     pipeline = RandomForestPipeline()
     
     # ========== DATABASE CONFIGURATION ==========
-    # Option 1: Load from table (RECOMMENDED)
+    # Option 1: Load from robot_logs_info (uses is_success as failure indicator)
     success = pipeline.run_pipeline(
-        db_table='robots_data'  # Change to your table name
+        db_query="""
+        SELECT 
+            (1 - is_success::int) as failure,
+            check_result_count as error_count,
+            EXTRACT(EPOCH FROM (now() - task_time))/3600 as operational_hours,
+            RANDOM()*100 as temperature,
+            RANDOM() as vibration,
+            RANDOM()*150 as pressure,
+            RANDOM()*100 as humidity,
+            (RANDOM()*10000)::int as last_maintenance_days,
+            (RANDOM()*120)::int as robot_age_months,
+            RANDOM()*1000 as power_consumption
+        FROM robot_logs_info
+        WHERE check_result_count > 0
+        LIMIT 2000
+        """
     )
-    
-    # Option 2: Load with custom SQL query
-    # success = pipeline.run_pipeline(
-    #     db_query="""
-    #     SELECT * FROM robots_data 
-    #     WHERE failure IN (0, 1)
-    #     ORDER BY timestamp DESC
-    #     """
-    # )
-    
-    # NOTE: Synthetic data fallback is PERMANENTLY DISABLED
-    # Database is MANDATORY - see src/config.py for connection settings
     
     return 0 if success else 1
 

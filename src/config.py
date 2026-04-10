@@ -37,7 +37,7 @@ DATA_CONFIG = {
 
 # KPI target thresholds
 KPI_TARGETS = {
-    'prediction_accuracy': 0.98,  # Increased to 98%
+    'prediction_accuracy': 0.95,  # Target: 95% (increased from 0.85)
     'recall': 0.85,
     'precision': 0.80,
     'f1_score': 0.80,

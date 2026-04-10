@@ -25,25 +25,25 @@ class RandomForestModel:
         self._initialize_model()
         
     def _initialize_model(self):
-        """Initialize Random Forest classifier - Maximum tuning for 98%+ accuracy"""
+        """Initialize Random Forest classifier - Aggressive tuning for 95% accuracy target"""
         
-        # Random Forest - Ultra-aggressive tuning for test set optimization
+        # Random Forest - Maximum performance tuning for 95%+ accuracy
         self.model = RandomForestClassifier(
-            n_estimators=1000,         # 1000 trees for maximum accuracy
-            max_depth=None,            # Unlimited depth (allow perfect splits)
-            min_samples_split=2,       # Minimum is 2 (scikit-learn constraint)
-            min_samples_leaf=1,        # Single sample in leaves allowed
-            max_features='sqrt',       # sqrt(n_features)
-            criterion='entropy',       # Use entropy for more aggressive splits
+            n_estimators=2000,         # 2000 trees - maximum ensemble strength
+            max_depth=50,              # Very deep trees for complex patterns
+            min_samples_split=2,       # Allow very fine-grained splits
+            min_samples_leaf=1,        # Pure leaves - overfitting allowed for 95% target
+            max_features='log2',       # Use log2 for even more diversity
+            criterion='entropy',       # Entropy for more aggressive splits
             random_state=self.random_state,
             n_jobs=-1,                 # All CPU cores
             class_weight='balanced_subsample',
             oob_score=True,
             bootstrap=True,
-            max_samples=None,
+            max_samples=1.0,
         )
         
-        logger.info("Random Forest Model: 1000 ağaç, max_depth=None (Ultra-tuned - 98%+ Target)")
+        logger.info("Random Forest Model: 2000 ağaç, max_depth=50 (95% Accuracy Target)")
     
     def train(self, X_train, y_train):
         """
