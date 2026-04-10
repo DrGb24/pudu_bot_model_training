@@ -19,8 +19,9 @@ for dir_path in [DATA_DIR, MODELS_DIR, LOGS_DIR, NOTEBOOKS_DIR]:
 # Model configuration
 MODEL_CONFIG = {
     'random_state': 42,
-    'test_size': 0.2,
-    'validation_size': 0.1,
+    'train_size': 0.7,       # 70% training
+    'validation_size': 0.15, # 15% validation
+    'test_size': 0.15,       # 15% test
 }
 
 # Data configuration
@@ -36,7 +37,7 @@ DATA_CONFIG = {
 
 # KPI target thresholds
 KPI_TARGETS = {
-    'prediction_accuracy': 0.85,
+    'prediction_accuracy': 0.98,  # Increased to 98%
     'recall': 0.85,
     'precision': 0.80,
     'f1_score': 0.80,

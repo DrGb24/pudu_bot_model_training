@@ -40,8 +40,10 @@ class RandomForestPipeline:
         self.model = RandomForestModel(random_state=MODEL_CONFIG['random_state'])
         self.kpi_metrics = KPIMetrics()
         self.X_train = None
+        self.X_val = None
         self.X_test = None
         self.y_train = None
+        self.y_val = None
         self.y_test = None
         self.feature_names = None
         self.results = {}
@@ -119,17 +121,19 @@ class RandomForestPipeline:
             logger.info(df[target_col].value_counts().to_string())
         
         # Prepare data
-        self.X_train, self.X_test, self.y_train, self.y_test, feature_names = \
+        self.X_train, self.X_val, self.X_test, self.y_train, self.y_val, self.y_test, feature_names = \
             self.data_prep.prepare_data(
                 filepath=data_file,
                 target_column=DATA_CONFIG['target_column'],
                 categorical_cols=DATA_CONFIG['categorical_columns'],
                 numerical_cols=DATA_CONFIG['numerical_columns'],
-                test_size=MODEL_CONFIG['test_size']
+                validation_size=MODEL_CONFIG.get('validation_size', 0.15),
+                return_validation=True
             )
         
         self.feature_names = feature_names
         logger.info(f"Training set: {self.X_train.shape}")
+        logger.info(f"Validation set: {self.X_val.shape}")
         logger.info(f"Test set: {self.X_test.shape}")
         logger.info(f"Features: {len(feature_names)}")
         

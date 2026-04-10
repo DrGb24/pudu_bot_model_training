@@ -227,7 +227,8 @@ class DataPreparation:
         return X_train_scaled
     
     def prepare_data(self, filepath, target_column, categorical_cols=None, 
-                    numerical_cols=None, test_size=0.2):
+                    numerical_cols=None, test_size=0.2, validation_size=None, 
+                    return_validation=False):
         """
         Complete pipeline for data preparation
         
@@ -236,10 +237,13 @@ class DataPreparation:
         - target_column: Name of target column
         - categorical_cols: List of categorical column names
         - numerical_cols: List of numerical column names
-        - test_size: Test set size ratio
+        - test_size: Test set size ratio (or use train/validation/test split if validation_size provided)
+        - validation_size: If provided, splits into train/validation/test (e.g., 0.15 for 70/15/15 split)
+        - return_validation: If True, returns validation set as well
         
         Returns:
-        - X_train, X_test, y_train, y_test, feature_names
+        - If return_validation=False: X_train, X_test, y_train, y_test, feature_names
+        - If return_validation=True: X_train, X_val, X_test, y_train, y_val, y_test, feature_names
         """
         
         # Load data
@@ -265,19 +269,46 @@ class DataPreparation:
         X = df[feature_cols]
         self.feature_columns = feature_cols
         
-        # Split data
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, test_size=test_size, random_state=self.random_state, stratify=y
-        )
-        
-        # Scale features
-        X_train_scaled, X_test_scaled = self.scale_features(X_train, X_test)
-        
-        logger.info(f"Data preparation complete!")
-        logger.info(f"Training set size: {X_train.shape}")
-        logger.info(f"Test set size: {X_test.shape}")
-        
-        return X_train_scaled, X_test_scaled, y_train, y_test, feature_cols
+        # Split data - with or without validation set
+        if validation_size is not None and return_validation:
+            # Split: train (70%), temp (30%)
+            X_train, X_temp, y_train, y_temp = train_test_split(
+                X, y, test_size=(validation_size + validation_size), 
+                random_state=self.random_state, stratify=y
+            )
+            
+            # Split temp into validation (50%) and test (50%)
+            val_test_ratio = validation_size / (validation_size + validation_size)
+            X_val, X_test, y_val, y_test = train_test_split(
+                X_temp, y_temp, test_size=0.5,
+                random_state=self.random_state, stratify=y_temp
+            )
+            
+            # Scale features
+            X_train_scaled = self.scaler.fit_transform(X_train)
+            X_val_scaled = self.scaler.transform(X_val)
+            X_test_scaled = self.scaler.transform(X_test)
+            
+            logger.info(f"Data preparation complete!")
+            logger.info(f"Training set size: {X_train.shape} (70%)")
+            logger.info(f"Validation set size: {X_val.shape} (15%)")
+            logger.info(f"Test set size: {X_test.shape} (15%)")
+            
+            return X_train_scaled, X_val_scaled, X_test_scaled, y_train, y_val, y_test, feature_cols
+        else:
+            # Original split: train and test only
+            X_train, X_test, y_train, y_test = train_test_split(
+                X, y, test_size=test_size, random_state=self.random_state, stratify=y
+            )
+            
+            # Scale features
+            X_train_scaled, X_test_scaled = self.scale_features(X_train, X_test)
+            
+            logger.info(f"Data preparation complete!")
+            logger.info(f"Training set size: {X_train.shape}")
+            logger.info(f"Test set size: {X_test.shape}")
+            
+            return X_train_scaled, X_test_scaled, y_train, y_test, feature_cols
 
 
 def create_synthetic_data(n_samples=1000):
