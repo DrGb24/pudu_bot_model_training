@@ -231,8 +231,23 @@ logger.info("="*50)
 logger.info("\n💾 Model Kaydediliyor...")
 model_path = Path('models/lstm/lstm_enhanced_focal.h5')
 model_path.parent.mkdir(parents=True, exist_ok=True)
-model.save(model_path)
-logger.info(f"✅ Model saved: {model_path}")
+
+# Weights only kaydına çevir
+model.save_weights(str(model_path.with_suffix('.weights.h5')))
+logger.info(f"✅ Model weights saved: {model_path.with_suffix('.weights.h5')}")
+
+# Architecture'ı JSON olarak kaydet
+import json
+with open(model_path.with_suffix('.json'), 'w') as f:
+    json.dump(model.to_json(), f)
+logger.info(f"✅ Model architecture saved: {model_path.with_suffix('.json')}")
+
+# Legacy compatibility için HDF5 de kaydet (compile=False)
+try:
+    model.save(model_path, save_format='h5')
+    logger.info(f"✅ Model saved (legacy HDF5): {model_path}")
+except Exception as e:
+    logger.warning(f"⚠️ Legacy HDF5 save hatası (normal): {e}")
 
 # Save training history
 history_path = Path('logs/lstm/training_history_enhanced.json')
