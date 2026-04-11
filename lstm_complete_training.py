@@ -78,13 +78,28 @@ lstm_model.model.compile(
 
 print("   Model recompiled")
 
+# Calculate class weights
+n_samples = len(y_train)
+n_failures = (y_train == 1).sum()
+n_normal = (y_train == 0).sum()
+
+class_weight_failure = n_samples / (2 * n_failures) if n_failures > 0 else 1
+class_weight_normal = n_samples / (2 * n_normal) if n_normal > 0 else 1
+
+class_weights = {0: class_weight_normal, 1: class_weight_failure}
+
+print(f"\n⚖️  Class Weights:")
+print(f"   Normal (0): {class_weight_normal:.2f}")
+print(f"   Failure (1): {class_weight_failure:.2f}")
+
 # Train model to match history (this replicates the previous training)
-print("\n⏳ Training model to match saved history (36 epochs)...")
+print("\n⏳ Training model to match saved history (36 epochs) with class weights...")
 lstm_model.model.fit(
     X_train, y_train,
     validation_data=(X_val, y_val),
     epochs=len(history['loss']),
     batch_size=32,
+    class_weight=class_weights,  # 🔑 Apply class weights
     verbose=0
 )
 

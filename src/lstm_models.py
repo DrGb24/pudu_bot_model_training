@@ -109,7 +109,8 @@ class LSTMModel:
               y_val: np.ndarray = None,
               epochs: int = 100,
               batch_size: int = 32,
-              verbose: int = 1) -> dict:
+              verbose: int = 1,
+              class_weight: dict = None) -> dict:
         """
         Train LSTM model
         
@@ -121,6 +122,7 @@ class LSTMModel:
             epochs: Number of training epochs
             batch_size: Batch size
             verbose: Verbosity level
+            class_weight: Dictionary mapping class indices to weights (for imbalanced data)
             
         Returns:
             Training history dictionary
@@ -158,13 +160,22 @@ class LSTMModel:
             validation_data = (X_val, y_val)
         
         # Train
+        fit_kwargs = {
+            'validation_data': validation_data,
+            'epochs': epochs,
+            'batch_size': batch_size,
+            'callbacks': callbacks,
+            'verbose': verbose
+        }
+        
+        # Add class weights if provided (for imbalanced data)
+        if class_weight is not None:
+            fit_kwargs['class_weight'] = class_weight
+            logger.info(f"   Using class weights: {class_weight}")
+        
         self.history = self.model.fit(
             X_train, y_train,
-            validation_data=validation_data,
-            epochs=epochs,
-            batch_size=batch_size,
-            callbacks=callbacks,
-            verbose=verbose
+            **fit_kwargs
         )
         
         logger.info(f"✅ Training completed")
