@@ -10,15 +10,25 @@ import numpy as np
 import pandas as pd
 from pathlib import Path
 from datetime import datetime
+import os
+
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'
+import tensorflow as tf
+tf.get_logger().setLevel('ERROR')
 
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
 from config import DATABASE_CONFIG
 from lstm_models import LSTMInference
 import joblib
-import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
+
+# Suppress Keras warnings
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
 
 # Setup logging
 logging.basicConfig(
@@ -73,8 +83,8 @@ class LSTMEnhancedInference:
     def _build_model(self):
         """Build LSTM architecture matching trained model"""
         model = keras.Sequential([
-            layers.Bidirectional(layers.LSTM(128, return_sequences=True, dropout=0.2),
-                                input_shape=(self.sequence_length, 9)),
+            layers.Input(shape=(self.sequence_length, 9)),
+            layers.Bidirectional(layers.LSTM(128, return_sequences=True, dropout=0.2)),
             layers.Bidirectional(layers.LSTM(64, return_sequences=True, dropout=0.2)),
             layers.Bidirectional(layers.LSTM(32, return_sequences=False, dropout=0.2)),
             layers.Dense(32, activation='relu', kernel_regularizer=keras.regularizers.l2(0.001)),
@@ -202,27 +212,34 @@ def demo_predictions():
         for key, value in info.items():
             logger.info(f"   {key}: {value}")
         
-        # CSV'den örnek veri al
-        csv_path = Path('data/lstm_combined_15k.csv')
-        if csv_path.exists():
-            logger.info(f"\n📊 Örnek veri yükleniyor: {csv_path}")
-            df_all = pd.read_csv(csv_path)
-            
-            # Normal örnek (failure = 0)
-            df_normal = df_all[df_all['failure'] == 0].iloc[:20]
-            result_normal = engine.predict_from_dataframe(df_normal)
-            logger.info(f"\n✅ Normal robot (last 10 rows):")
-            logger.info(f"   Probability: {result_normal['probability']:.4f}")
-            logger.info(f"   Prediction: {'FAILURE' if result_normal['prediction'] else 'NORMAL'}")
-            logger.info(f"   Risk: {result_normal['risk_level']}")
-            
-            # Failure örnek (failure = 1)
-            df_failure = df_all[df_all['failure'] == 1].iloc[:20]
-            result_failure = engine.predict_from_dataframe(df_failure)
-            logger.info(f"\n⚠️ Failing robot (last 10 rows):")
-            logger.info(f"   Probability: {result_failure['probability']:.4f}")
-            logger.info(f"   Prediction: {'FAILURE' if result_failure['prediction'] else 'NORMAL'}")
-            logger.info(f"   Risk: {result_failure['risk_level']}")
+        # Örnek veri oluştur (DB'den veya simulated)
+        logger.info(f"\n📊 Örnek tahminler yapılıyor...")
+        
+        # Normal robot örneği (simulation)
+        df_normal = pd.DataFrame([
+            {'error_count': i % 5, 'task_hour': (i * 2) % 24, 'day_of_month': i % 28 + 1,
+             'day_of_week': i % 7, 'robot_id_length': 15, 'software_version_length': 5,
+             'product_code_type': 1, 'error_severity': i % 3, 'hourly_error_rate': 0}
+            for i in range(15)
+        ])
+        result_normal = engine.predict_from_dataframe(df_normal)
+        logger.info(f"\n✅ Normal robot (tahmin):")
+        logger.info(f"   Probability: {result_normal['probability']:.4f}")
+        logger.info(f"   Prediction: {'FAILURE' if result_normal['prediction'] else 'NORMAL'}")
+        logger.info(f"   Risk: {result_normal['risk_level']}")
+        
+        # Failure örneği (simulation)
+        df_failure = pd.DataFrame([
+            {'error_count': 15 + (i % 5), 'task_hour': (i * 3) % 24, 'day_of_month': i % 28 + 1,
+             'day_of_week': i % 7, 'robot_id_length': 15, 'software_version_length': 5,
+             'product_code_type': 2, 'error_severity': 8 + (i % 2), 'hourly_error_rate': 1}
+            for i in range(15)
+        ])
+        result_failure = engine.predict_from_dataframe(df_failure)
+        logger.info(f"\n⚠️ Failing robot (tahmin):")
+        logger.info(f"   Probability: {result_failure['probability']:.4f}")
+        logger.info(f"   Prediction: {'FAILURE' if result_failure['prediction'] else 'NORMAL'}")
+        logger.info(f"   Risk: {result_failure['risk_level']}")
             
         logger.info("\n" + "="*80)
         logger.info("✅ DEMO TAMAMLANDI")
