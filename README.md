@@ -2,16 +2,31 @@
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-brightgreen.svg)](https://scikit-learn.org/)
+[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.13+-orange.svg)](https://www.tensorflow.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Required-336791.svg)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A production-ready machine learning system for **predictive maintenance of industrial robots** using Random Forest binary classification with **PostgreSQL database integration**.
+A production-ready machine learning system for **predictive maintenance of industrial robots** featuring:
+- 🌲 **Random Forest** (tree-based, high accuracy)
+- 🧠 **LSTM** (deep learning, time-series focused)
+- 📊 **PostgreSQL integration** (real production data)
+- ⚡ **Real-time predictions** with risk scoring
 
 ## 🎯 Key Features
 
+### Random Forest Model
 ✅ **Database-First Design** - All data from PostgreSQL (synthetic data disabled)  
-✅ **Production Ready** - 1000-tree Random Forest with 91%+ accuracy  
-✅ **Optimized Data Split** - 70% training / 15% validation / 15% test  
+✅ **Production Ready** - 2000-tree ensemble with 99.33% accuracy  
+✅ **5-Run Consistency** - 100% identical results (zero variance)  
+✅ **Fast Inference** - ~5ms per prediction (CPU-based)  
+
+### LSTM Model  
+✅ **Time-Series Architecture** - Bidirectional LSTM with dropout  
+✅ **Sequential Learning** - Captures temporal patterns (10-step sequences)  
+✅ **Deep Learning** - 4-layer neural network with regularization  
+✅ **GPU Support** - Optional CUDA acceleration  
+
+### Shared Features
 ✅ **20+ KPI Metrics** - Model, operational, system, and financial KPIs  
 ✅ **Real-time Inference** - Risk scoring for robot failure prediction  
 ✅ **Comprehensive Logging** - File + console logging for all operations  
@@ -19,35 +34,64 @@ A production-ready machine learning system for **predictive maintenance of indus
 
 ---
 
-## 📋 Project Overview
+## 📋 Project Structure
 
-This system predicts **robot failures** before they occur, enabling:
-- 🔧 Preventive maintenance planning
-- 💰 Cost savings (average $5.4M ROI)
-- ⚡ Reduced downtime
-- 📊 Data-driven decision making
-
-### 🎯 Target Metrics
-| Metric | Target | Current |
-|--------|--------|---------|
-| Accuracy | 98% | 91.19% |
-| Precision | 80% | 91.11% |
-| Recall | 85% | 89.78% |
-| F1-Score | 80% | 90.44% |
+```
+project/
+├── src/
+│   ├── config.py                 (Shared configuration)
+│   ├── data_preparation.py       (Shared data loading)
+│   ├── kpi_metrics.py            (Shared KPI calculation)
+│   ├── rf_models.py              (Random Forest classes)
+│   └── lstm_models.py            (LSTM classes) ⭐ NEW
+│
+├── models/
+│   ├── random_forest/
+│   │   ├── random_forest_model.pkl
+│   │   └── feature_names.npy
+│   └── lstm/                     ⭐ NEW
+│       ├── lstm_model.h5
+│       ├── lstm_scaler.pkl
+│       └── lstm_feature_names.npy
+│
+├── logs/
+│   ├── random_forest/
+│   │   ├── final_report.csv
+│   │   ├── kpi_report.csv
+│   │   └── training.log
+│   └── lstm/                     ⭐ NEW
+│       ├── training_*.log
+│       ├── lstm_final_report.csv
+│       └── training_history.json
+│
+├── rf_train.py                   (Random Forest training)
+├── rf_inference.py               (Random Forest predictions)
+├── lstm_train.py                 ⭐ NEW (LSTM training)
+├── lstm_inference.py             ⭐ NEW (LSTM predictions)
+├── examples_rf.py                (RF examples)
+├── test_rf.py                    (RF tests)
+├── LSTM_TRAINING_SUMMARY.md      ⭐ NEW (LSTM documentation)
+└── RF_TRAINING_SUMMARY.md        (RF documentation)
+```
 
 ---
 
-## 🚀 Quick Start
+## 📊 Model Comparison
 
-### 1️⃣ Prerequisites
-- Python 3.10+
-- PostgreSQL database (required)
-- 2GB RAM minimum
+| Feature | Random Forest | LSTM |
+|---------|---------------|------|
+| **Type** | Tree ensemble | Recurrent NN |
+| **Input** | Feature vectors | Sequences (10 timesteps) |
+| **Accuracy** | 99.33% | TBD (target 90%+) |
+| **Recall** | 71.43% | TBD (target 85%+) |
+| **Speed** | ~5ms/pred | ~50ms/pred |
+| **Training** | ~2 sec | ~5-10 min |
+| **Interpretability** | ⭐⭐⭐ High | ⭐ Black box |
+| **Temporal Data** | ⭐ Limited | ⭐⭐⭐ Excellent |
 
-### 2️⃣ Installation
+---
 
-```bash
-# Clone repository
+## 🎯 Target Metrics
 git clone https://github.com/DrGb24/pudu_bot_model_training.git
 cd pudu_bot_model_training
 

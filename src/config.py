@@ -54,6 +54,28 @@ KPI_TARGETS = {
     'connectivity_health': 0.95,
 }
 
+# LSTM Model Configuration
+LSTM_CONFIG = {
+    'sequence_length': 10,          # Timesteps in sequence
+    'lstm_units': 128,              # First LSTM layer units
+    'dropout_rate': 0.2,            # Dropout regularization
+    'dense_units': 64,              # First dense layer
+    'learning_rate': 0.001,         # Adam optimizer LR
+    'batch_size': 32,               # Training batch size
+    'epochs': 50,                   # Max epochs (with early stopping)
+    'early_stopping_patience': 15,  # Early stopping patience
+    'validation_split': 0.15,       # Validation portion
+}
+
+# Random Forest Configuration (for reference)
+RF_CONFIG = {
+    'n_estimators': 2000,
+    'max_depth': 50,
+    'criterion': 'entropy',
+    'random_state': 42,
+    'n_jobs': -1,
+}
+
 # Database configuration (PostgreSQL / SQLite)
 DATABASE_CONFIG = {
     'type': 'postgresql',  # 'postgresql' or 'sqlite'
