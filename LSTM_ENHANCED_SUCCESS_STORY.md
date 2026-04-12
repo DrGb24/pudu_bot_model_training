@@ -1,4 +1,4 @@
-# LSTM Enhanced Model - Başarı Yolculuğu 🎉
+# LSTM Enhanced Model - Başarı Yolculuğu 
 
 ## Özet
 
@@ -16,7 +16,7 @@
 
 ### Problem Statement (Başlangıç)
 1. **Random Forest güçlü ama limited:**
-   - Accuracy: 99.33% ✓
+   - Accuracy: 99.33% 
    - Recall: 71.43% (29 failure kaçırıyor)
    - Feature engineering'e bağlı
 
@@ -31,22 +31,22 @@
 Problem: LSTM can't learn failures from imbalanced data
          ↓
 Solution Components:
-├─ 1. Sentetik Veri Oluşturma (11,100 examples)
-│  └─ Failure rate: 5.24% → 12.00% (more balanced)
-│
-├─ 2. Real + Synthetic Merge (14,993 total)
-│  └─ Training set: 18,860 SMOTE samples (40%+ failures)
-│
-├─ 3. Advanced Loss Function (Focal Loss)
-│  └─ Γ=2.0, α=0.25 → Hard examples weighted heavier
-│
-├─ 4. SMOTE Over-sampling
-│  └─ Minority class examples synthesized
-│
-└─ 5. Enhanced Architecture
-   └─ BiLSTM 3-layer + L2 regularization + Dropout
+ 1. Sentetik Veri Oluşturma (11,100 examples)
+   Failure rate: 5.24% → 12.00% (more balanced)
 
-Result: 96.96% Recall! 🚀
+ 2. Real + Synthetic Merge (14,993 total)
+   Training set: 18,860 SMOTE samples (40%+ failures)
+
+ 3. Advanced Loss Function (Focal Loss)
+   Γ=2.0, α=0.25 → Hard examples weighted heavier
+
+ 4. SMOTE Over-sampling
+   Minority class examples synthesized
+
+ 5. Enhanced Architecture
+    BiLSTM 3-layer + L2 regularization + Dropout
+
+Result: 96.96% Recall! 
 ```
 
 ---
@@ -142,9 +142,9 @@ Metrics: Accuracy, Precision, Recall, AUC-ROC
 |--------|----|----|------|----|
 | **Accuracy** | 99.33% | 82.16% | 98.89% | LSTM Enhanced |
 | **Precision** | 100% | 7.89% | 92.53% | Random Forest (but LSTM better overall) |
-| **Recall** | 71.43% | 15.00% | **96.96%** | **LSTM Enhanced** 🏆 |
-| **F1-Score** | 83.33% | 10.34% | 94.69% | **LSTM Enhanced** 🏆 |
-| **AUC-ROC** | N/A | 0.499 | **0.9968** | **LSTM Enhanced** 🏆 |
+| **Recall** | 71.43% | 15.00% | **96.96%** | **LSTM Enhanced**  |
+| **F1-Score** | 83.33% | 10.34% | 94.69% | **LSTM Enhanced**  |
+| **AUC-ROC** | N/A | 0.499 | **0.9968** | **LSTM Enhanced**  |
 | Test Failures | 14 | 40 | 230 | 230 (larger test set) |
 | True Positives | 10 | 6 | 223 | 223 |
 | False Positives | 0 | 70 | 18 | 18 |
@@ -201,26 +201,26 @@ results = engine.predict_batch([df1, df2, df3, ...])
 
 ```
 models/lstm/
-├── lstm_enhanced_focal.h5           (Full model - legacy)
-├── lstm_enhanced_focal.weights.h5   (Weights only - recommended)
-├── lstm_enhanced_focal.json         (Architecture)
-└── lstm_scaler_enhanced.pkl         (Feature normalizer)
+ lstm_enhanced_focal.h5           (Full model - legacy)
+ lstm_enhanced_focal.weights.h5   (Weights only - recommended)
+ lstm_enhanced_focal.json         (Architecture)
+ lstm_scaler_enhanced.pkl         (Feature normalizer)
 
 logs/lstm/
-├── lstm_report_enhanced.csv         (Performance metrics)
-└── training_history_enhanced.json   (Training curves)
+ lstm_report_enhanced.csv         (Performance metrics)
+ training_history_enhanced.json   (Training curves)
 
 data/
-└── lstm_combined_15k.csv            (Training dataset)
+ lstm_combined_15k.csv            (Training dataset)
 ```
 
 ### Deployment Checklist
 
-- ✅ Model trained and evaluated (96.96% recall)
-- ✅ Inference engine implemented (inference_enhanced.py)
-- ✅ Model weights extracted (weights.h5 + json)
-- ✅ Feature scaler saved (pickle)
-- ✅ Performance metrics documented
+-  Model trained and evaluated (96.96% recall)
+-  Inference engine implemented (inference_enhanced.py)
+-  Model weights extracted (weights.h5 + json)
+-  Feature scaler saved (pickle)
+-  Performance metrics documented
 - ⏳ Staging environment setup
 - ⏳ A/B testing with production data
 - ⏳ Monitoring dashboard
@@ -253,28 +253,28 @@ data/
 ## Comparison: LSTM vs Random Forest
 
 ### When to Use LSTM Enhanced
-✅ **Strengths:**
+ **Strengths:**
 - Temporal sequencing captured
 - 96.96% recall - catches almost all failures
 - Can model complex non-linear patterns
 - Better AUC-ROC for ranking
 - Deep learning future-proof
 
-❌ **Limitations:**
+ **Limitations:**
 - Requires sequence_length=10 (20 observations min)
 - Inference slower than RF (GPU recommended for production)
 - Harder to explain individual predictions
 - Requires careful preprocessing
 
 ### When to Use Random Forest
-✅ **Strengths:**
+ **Strengths:**
 - 100% precision - no false alarms
 - Fast inference (< 1ms per sample)
 - Explainable (feature importance)
 - No preprocessing required
 - Robust to outliers
 
-❌ **Limitations:**
+ **Limitations:**
 - 71.43% recall - misses 29% of failures
 - Doesn't capture temporal patterns well
 - Feature engineering needed
@@ -368,13 +368,13 @@ Commit 548adf0: Inference Engine (production-ready)
 
 **LSTM Enhanced Model is production-ready and outperforms Random Forest.**
 
-- ✅ Recall: 96.96% (catches nearly all failures)
-- ✅ Precision: 92.53% (minimal false alarms)
-- ✅ AUC-ROC: 0.9968 (nearly perfect discrimination)
-- ✅ Tested and validated
-- ✅ Inference engine ready
+-  Recall: 96.96% (catches nearly all failures)
+-  Precision: 92.53% (minimal false alarms)
+-  AUC-ROC: 0.9968 (nearly perfect discrimination)
+-  Tested and validated
+-  Inference engine ready
 
-**Deployment recommendation: MOVE FORWARD WITH LSTM ENHANCED** 🚀
+**Deployment recommendation: MOVE FORWARD WITH LSTM ENHANCED** 
 
 ---
 

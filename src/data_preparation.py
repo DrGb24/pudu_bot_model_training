@@ -84,7 +84,7 @@ class DataPreparation:
                 sslmode=db_config.get('ssl_mode', 'disable')
             )
             
-            logger.info(f"✅ Connected to PostgreSQL: {db_config['database']}@{db_config['host']}")
+            logger.info(f" Connected to PostgreSQL: {db_config['database']}@{db_config['host']}")
             
             # Load data
             if query:
@@ -98,15 +98,15 @@ class DataPreparation:
                 raise ValueError("Either 'query' or 'table_name' must be provided")
             
             conn.close()
-            logger.info(f"✅ Data loaded successfully. Shape: {df.shape}")
+            logger.info(f" Data loaded successfully. Shape: {df.shape}")
             
             return df
             
         except psycopg2.Error as e:
-            logger.error(f"❌ Database error: {e}")
+            logger.error(f" Database error: {e}")
             raise
         except Exception as e:
-            logger.error(f"❌ Error loading data: {e}")
+            logger.error(f" Error loading data: {e}")
             raise
             
     def get_database_tables(self, db_config):
@@ -131,11 +131,11 @@ class DataPreparation:
             tables = pd.read_sql_query(query, conn)
             conn.close()
             
-            logger.info(f"✅ Available tables: {tables['table_name'].tolist()}")
+            logger.info(f" Available tables: {tables['table_name'].tolist()}")
             return tables['table_name'].tolist()
             
         except Exception as e:
-            logger.error(f"❌ Error fetching tables: {e}")
+            logger.error(f" Error fetching tables: {e}")
             raise
             
     def get_table_schema(self, db_config, table_name):
@@ -160,14 +160,14 @@ class DataPreparation:
             schema = pd.read_sql_query(query, conn)
             conn.close()
             
-            logger.info(f"✅ Schema for '{table_name}':")
+            logger.info(f" Schema for '{table_name}':")
             for idx, row in schema.iterrows():
                 logger.info(f"   - {row['column_name']}: {row['data_type']}")
             
             return schema
             
         except Exception as e:
-            logger.error(f"❌ Error fetching schema: {e}")
+            logger.error(f" Error fetching schema: {e}")
             raise
             
     def handle_missing_values(self, df, strategy='mean'):

@@ -1,6 +1,6 @@
 """
-Random Forest Tahmin Motoru
-Eğitilmiş modeli kullanarak yeni veriler için tahmin yapma
+Random Forest Inference Engine
+Loads trained Random Forest model for failure prediction on new robot data
 """
 
 import numpy as np
@@ -20,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 
 class RandomForestInference:
-    """Random Forest tahmin motoru"""
+    """
+    Random Forest-based inference engine for robot failure prediction.
+    Provides fast baseline predictions using ensemble tree methods.
+    """
     
     def __init__(self):
         self.model = None
@@ -30,26 +33,32 @@ class RandomForestInference:
         self.load_scaler()
         
     def load_model(self):
-        """Eğitilmiş modeli yükle"""
+        """
+        Load pre-trained Random Forest model and feature names from disk.
         
+        Raises:
+            FileNotFoundError: If model file not found
+        """
         model_path = MODELS_DIR / 'random_forest_model.pkl'
         
         if not model_path.exists():
-            raise FileNotFoundError(f"Model bulunamadı: {model_path}")
+            raise FileNotFoundError(f"Model not found: {model_path}")
         
         self.model = joblib.load(model_path)
         
-        # Özellik adlarını yükle
+        # Load feature names for proper column ordering
         features_path = MODELS_DIR / 'feature_names.npy'
         if features_path.exists():
             self.feature_names = np.load(features_path, allow_pickle=True)
         
-        logger.info(f"✅ Model yüklendi")
-        logger.info(f"   Özellikler: {len(self.feature_names) if self.feature_names is not None else 'Bilinmiyor'}")
+        logger.info("Model loaded successfully")
+        logger.info(f"   Features: {len(self.feature_names) if self.feature_names is not None else 'Unknown'}")
         
     def load_scaler(self):
-        """Veri ölçeklemesi için scaler'ı yükle"""
-        
+        """
+        Load feature normalization scaler from data preparation module.
+        Optional - used for input normalization if available.
+        """
         try:
             from src.data_preparation import DataPreparation
             self.scaler = DataPreparation().scaler
@@ -58,18 +67,18 @@ class RandomForestInference:
     
     def predict(self, X):
         """
-        Tahmin yap
+        Generate predictions on input samples.
         
-        Parameters:
-        - X: DataFrame veya numpy array
+        Args:
+            X (pd.DataFrame or np.ndarray): Feature matrix with robot sensor data
         
         Returns:
-        - predictions (0 = Arıza yok, 1 = Arıza var)
-        - probabilities (olasılık değerleri)
+            tuple: (predictions, probabilities)
+                - predictions: Binary array (0=normal, 1=failure)
+                - probabilities: 2D array of class probabilities
         """
-        
         if isinstance(X, pd.DataFrame):
-            # Doğru sütun sırası
+            # Ensure correct column ordering
             if self.feature_names is not None:
                 X = X[self.feature_names]
         
@@ -80,39 +89,50 @@ class RandomForestInference:
     
     def predict_failure_risk(self, X):
         """
-        Her mühendislik için arıza riskini tahmin et
+        Generate failure risk assessment for robot fleet.
+        
+        Produces structured output with probabilities and risk categorization.
+        
+        Args:
+            X (pd.DataFrame): Feature data for multiple robots
         
         Returns:
-        - DataFrame: tahmin ve risk skorları
+            pd.DataFrame: Results with columns:
+                - 'prediction': Categorical prediction (Failure/Normal)
+                - 'no_failure_prob': Probability of normal operation
+                - 'failure_prob': Probability of failure
+                - 'risk_score': Numeric risk score (0-1)
+                - 'risk_level': Categorical risk level (LOW/MEDIUM/HIGH)
         """
-        
         predictions, probabilities = self.predict(X)
         
-        # Sonuçlar dataframe'i
+        # Construct results dataframe with risk assessment
         results = pd.DataFrame({
-            'prediction': ['Arıza Var' if p == 1 else 'Normal' for p in predictions],
+            'prediction': ['Failure' if p == 1 else 'Normal' for p in predictions],
             'no_failure_prob': probabilities[:, 0],
             'failure_prob': probabilities[:, 1],
             'risk_score': probabilities[:, 1],
             'risk_level': pd.cut(probabilities[:, 1], 
                                 bins=[0, 0.3, 0.6, 1.0],
-                                labels=['DÜŞÜK', 'ORTA', 'YÜKSEK'])
+                                labels=['LOW', 'MEDIUM', 'HIGH'])
         })
         
         return results
 
 
 def example_inference():
-    """Tahmin örneği"""
-    
+    """
+    Execute inference demonstration with example robot telemetry data.
+    Validates that Random Forest model is functional.
+    """
     logger.info("="*60)
-    logger.info("RANDOM FOREST TAHMİN ÖRNEĞİ")
+    logger.info("RANDOM FOREST INFERENCE DEMONSTRATION")
     logger.info("="*60)
     
-    # Tahmin motorunu başlat
+    # Initialize inference engine
     inference = RandomForestInference()
     
-    # Örnek veriler (eğitim verisiyle aynı özellikler)
+    # Example telemetry data (9 features matching training data)
     sample_data = pd.DataFrame({
         'temperature': [75, 85, 90],
         'vibration': [0.4, 0.6, 0.9],
@@ -125,25 +145,25 @@ def example_inference():
         'power_consumption': [450, 550, 650],
     })
     
-    logger.info("\n📊 GİRİŞ VERİLERİ:")
+    logger.info("\nInput Data:")
     logger.info(sample_data.to_string())
     
-    # Tahmin yap
+    # Generate predictions
     try:
         results = inference.predict_failure_risk(sample_data)
         
-        logger.info("\n🎯 TAHMİN SONUÇLARI:")
+        logger.info("\nPrediction Results:")
         logger.info(results.to_string())
         
-        # Her robot için ayrıntılı bilgi
-        logger.info("\n📈 AYRINTI:")
+        # Detailed assessment per robot
+        logger.info("\nDetailed Analysis:")
         for idx, row in results.iterrows():
             risk = row['risk_level']
             prob = row['failure_prob']
-            logger.info(f"   Robot {idx}: {risk} Risk (%{prob*100:.1f} olasılık)")
+            logger.info(f"   Robot {idx}: {risk} Risk ({prob*100:.1f}% failure probability)")
         
     except Exception as e:
-        logger.error(f"Tahmin hatası: {str(e)}")
+        logger.error(f"Prediction error: {str(e)}")
 
 
 if __name__ == '__main__':

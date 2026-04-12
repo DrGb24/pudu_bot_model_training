@@ -62,7 +62,7 @@ class RandomForestModel:
         training_time = (datetime.now() - start_time).total_seconds()
         self.trained = True
         
-        logger.info(f"✅ Model eğitimi tamamlandı ({training_time:.2f} saniye)")
+        logger.info(f" Model eğitimi tamamlandı ({training_time:.2f} saniye)")
         logger.info(f"   - OOB (Out-of-Bag) Skoru: {self.model.oob_score_:.4f}")
         
     def predict(self, X):
@@ -161,11 +161,11 @@ class RandomForestModel:
             raise ValueError("Henüz eğitilmemiş model kaydedilemez!")
         
         joblib.dump(self.model, filepath)
-        logger.info(f"✅ Model kaydedildi: {filepath}")
+        logger.info(f" Model kaydedildi: {filepath}")
     
     def load(self, filepath):
         """Modeli yükle"""
         
         self.model = joblib.load(filepath)
         self.trained = True
-        logger.info(f"✅ Model yüklendi: {filepath}")
+        logger.info(f" Model yüklendi: {filepath}")

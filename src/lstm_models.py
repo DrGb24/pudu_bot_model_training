@@ -97,7 +97,7 @@ class LSTMModel:
         
         self.model = model
         
-        logger.info(f"✅ LSTM Model built successfully")
+        logger.info(f" LSTM Model built successfully")
         logger.info(f"   - Total parameters: {model.count_params():,}")
         
         return model
@@ -131,7 +131,7 @@ class LSTMModel:
         if self.model is None:
             raise RuntimeError("Model not built. Call build_model() first.")
         
-        logger.info(f"🚀 Starting LSTM training...")
+        logger.info(f" Starting LSTM training...")
         logger.info(f"   Training samples: {X_train.shape[0]}")
         logger.info(f"   Sequence length: {X_train.shape[1]}")
         logger.info(f"   Features: {X_train.shape[2]}")
@@ -178,7 +178,7 @@ class LSTMModel:
             **fit_kwargs
         )
         
-        logger.info(f"✅ Training completed")
+        logger.info(f" Training completed")
         
         return self.history.history
     
@@ -196,7 +196,7 @@ class LSTMModel:
             Evaluation metrics dictionary
         """
         
-        logger.info("📊 Evaluating LSTM model on test set...")
+        logger.info(" Evaluating LSTM model on test set...")
         
         # Get predictions
         y_pred_prob = self.model.predict(X_test, verbose=0)
@@ -264,13 +264,13 @@ class LSTMModel:
         
         Path(filepath).parent.mkdir(parents=True, exist_ok=True)
         self.model.save(filepath)
-        logger.info(f"✅ Model saved: {filepath}")
+        logger.info(f" Model saved: {filepath}")
     
     def load_model(self, filepath: str):
         """Load model weights from file"""
         
         self.model = keras.models.load_model(filepath)
-        logger.info(f"✅ Model loaded: {filepath}")
+        logger.info(f" Model loaded: {filepath}")
     
     def get_feature_importance(self, feature_names: list = None) -> dict:
         """
@@ -330,7 +330,7 @@ class LSTMInference:
         if scaler_path:
             self.scaler = joblib.load(scaler_path)
         
-        logger.info(f"✅ LSTM Inference engine initialized")
+        logger.info(f" LSTM Inference engine initialized")
     
     def predict(self, X: np.ndarray) -> dict:
         """

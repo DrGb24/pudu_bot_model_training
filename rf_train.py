@@ -1,6 +1,6 @@
 """
-Main training and evaluation pipeline
-Complete predictive maintenance system with KPI tracking
+Random Forest Training Pipeline
+Complete predictive maintenance system with PostgreSQL integration and KPI tracking
 """
 
 import numpy as np
@@ -33,7 +33,10 @@ logger = logging.getLogger(__name__)
 
 
 class RandomForestPipeline:
-    """Random Forest Arıza Tahmin Pipeline"""
+    """
+    Random Forest training and evaluation pipeline for predictive maintenance.
+    Implements 6-step orchestration process with PostgreSQL data integration.
+    """
     
     def __init__(self):
         self.data_prep = DataPreparation(random_state=MODEL_CONFIG['random_state'])
@@ -50,71 +53,72 @@ class RandomForestPipeline:
         
     def prepare_data(self, db_table=None, db_query=None):
         """
-        Load and prepare data from PostgreSQL database (MANDATORY)
+        Load and prepare training data from PostgreSQL database.
+        Database connectivity is mandatory - no synthetic data fallback.
         
         Parameters:
-        - db_table: Table name to load from database
-        - db_query: Custom SQL query (optional alternative to table name)
+            db_table (str): Table name to load from database
+            db_query (str): Custom SQL query (alternative to table name)
         
         Raises:
-        - ValueError: If neither db_table nor db_query provided
-        - RuntimeError: If PostgreSQL connection fails (no fallback allowed)
+            ValueError: If neither db_table nor db_query provided
+            RuntimeError: If PostgreSQL connection fails
         """
         
         logger.info("="*60)
-        logger.info("ADIM 1: VERİ HAZIRLAMASI (DATABASE REQUIRED)")
+        logger.info("STEP 1: DATA PREPARATION")
         logger.info("="*60)
         
-        # Validate input
+        # Validate inputs
         if not db_table and not db_query:
-            logger.error("❌ CRITICAL: Neither db_table nor db_query provided")
+            logger.error("CRITICAL: Neither db_table nor db_query provided")
             raise ValueError(
-                "❌ Database configuration required! Provide either 'db_table' or 'db_query'. "
-                "Synthetic data is DISABLED - database connection is mandatory."
+                "Database configuration required. Provide either 'db_table' or 'db_query'. "
+                "Note: Synthetic data is disabled - database connection is mandatory."
             )
         
-        logger.info("🔌 Loading data from PostgreSQL database...")
+        logger.info("Loading data from PostgreSQL database...")
         df = None
         data_file = None
         
         try:
             if db_table:
-                logger.info(f"📋 Table: {db_table}")
+                logger.info(f"Table: {db_table}")
                 df = self.data_prep.load_from_database(DATABASE_CONFIG, table_name=db_table)
             else:
-                logger.info(f"🔍 Executing custom SQL query...")
+                logger.info("Executing custom SQL query...")
                 df = self.data_prep.load_from_database(DATABASE_CONFIG, query=db_query)
             
             if df is None or len(df) == 0:
                 raise ValueError("Database query returned empty result set")
             
-            logger.info(f"✅ PostgreSQL data loaded successfully: {df.shape[0]} samples")
+            logger.info(f"PostgreSQL data loaded successfully: {df.shape[0]} samples")
             
-            # Archive data snapshot for audit trail
+            # Create audit trail snapshot of loaded data
             data_file = DATA_DIR / 'database_snapshot.csv'
             df.to_csv(data_file, index=False)
-            logger.info(f"💾 Data snapshot saved for audit: {data_file}")
+            logger.info(f"Data snapshot saved for audit: {data_file}")
                 
         except Exception as e:
-            logger.error(f"❌ CRITICAL DATABASE ERROR: {str(e)}")
-            logger.error("❌ Synthetic data fallback is DISABLED per project policy")
-            logger.error("⚠️  Database configuration: Please check src/config.py")
+            logger.error(f"CRITICAL DATABASE ERROR: {str(e)}")
+            logger.error("Synthetic data fallback is disabled per project policy")
+            logger.error("Please verify database connection in src/config.py")
             raise RuntimeError(
                 f"Failed to load data from PostgreSQL database. "
                 f"Synthetic data fallback is disabled. "
                 f"Please verify database connection. Original error: {str(e)}"
             )
         
-        # Show data info
-        logger.info(f"\n📊 Data Info:")
+        # Log data statistics
+        logger.info(f"\nData Information:")
         logger.info(f"   Shape: {df.shape}")
         logger.info(f"   Columns: {list(df.columns)}")
-        logger.info(f"\n📈 Target Distribution:")
+        logger.info(f"\nTarget Distribution:")
         target_col = DATA_CONFIG['target_column']
         if target_col in df.columns:
             logger.info(df[target_col].value_counts().to_string())
         
-        # Prepare data
+        # Prepare data splits (train/validation/test)
         self.X_train, self.X_val, self.X_test, self.y_train, self.y_val, self.y_test, feature_names = \
             self.data_prep.prepare_data(
                 filepath=data_file,
@@ -132,72 +136,87 @@ class RandomForestPipeline:
         logger.info(f"Features: {len(feature_names)}")
         
     def train_model(self):
-        """Random Forest modelini eğit"""
+        """
+        Train Random Forest classifier on prepared data.
+        Uses 1000 trees with entropy criterion for information gain.
+        """
         
         logger.info("\n" + "="*60)
-        logger.info("ADIM 2: RANDOM FOREST MODELİ EĞİTİMİ")
+        logger.info("STEP 2: RANDOM FOREST MODEL TRAINING")
         logger.info("="*60)
         
         self.model.train(self.X_train, self.y_train)
         
     def evaluate_model(self):
-        """Modeli test setinde değerlendir"""
+        """
+        Evaluate model performance on test set.
+        Computes accuracy, precision, recall, F1-score, and feature importance.
+        """
         
         logger.info("\n" + "="*60)
-        logger.info("ADIM 3: MODEL DEĞERLENDİRMESİ")
+        logger.info("STEP 3: MODEL EVALUATION")
         logger.info("="*60)
         
-        # Model değerlendirmesi
+        # Evaluate on test set
         self.results['evaluation'] = self.model.evaluate(self.X_test, self.y_test)
         
-        # En önemli özellikleri bul
+        # Calculate feature importance ranking
         importance_df = self.model.get_feature_importance(self.feature_names)
         self.results['feature_importance'] = importance_df
         
-        logger.info(f"\n📊 EN ÖNEMLİ 10 ÖZELLİK:")
+        logger.info("\nTop 10 Important Features:")
         logger.info(importance_df.head(10).to_string(index=False))
         
     def calculate_kpis(self):
-        """KPI'ları hesapla - Model performance only (skip operational/system KPIs for now)"""
+        """
+        Calculate model performance KPIs.
+        Computes accuracy, precision, recall against target thresholds.
+        """
         
         logger.info("\n" + "="*60)
-        logger.info("ADIM 4: KPI HESAPLAMASı (MODEL PERFORMANCE)")
+        logger.info("STEP 4: KPI CALCULATION")
         logger.info("="*60)
         
-        # Test setinden tahminler al
+        # Generate predictions on test set
         y_pred = self.model.predict(self.X_test)
         y_pred_proba = self.model.predict_proba(self.X_test)
         
-        # Model Performance KPI'ları ONLY (skip operational/system KPIs to avoid datetime errors)
+        # Calculate model performance metrics
         model_kpis = self.kpi_metrics.calculate_model_performance_kpis(
             self.y_test, y_pred, y_pred_proba
         )
         
         self.results['model_kpis'] = model_kpis
-        logger.info(f"✅ Model KPIs calculated")
-        logger.info(f"   - Accuracy: {model_kpis.get('accuracy', 'N/A')}")
-        logger.info(f"   - Precision: {model_kpis.get('precision', 'N/A')}")
-        logger.info(f"   - Recall: {model_kpis.get('recall', 'N/A')}")
+        logger.info("Model performance KPIs calculated")
+        logger.info(f"   Accuracy: {model_kpis.get('accuracy', 'N/A')}")
+        logger.info(f"   Precision: {model_kpis.get('precision', 'N/A')}")
+        logger.info(f"   Recall: {model_kpis.get('recall', 'N/A')}")
         
     def save_model(self):
-        """Modeli kaydet"""
+        """
+        Persist trained model and metadata to disk.
+        Saves both model weights and feature names for inference.
+        """
         
         logger.info("\n" + "="*60)
-        logger.info("ADIM 5: MODEL KAYDETME")
+        logger.info("STEP 5: MODEL PERSISTENCE")
         logger.info("="*60)
         
         filepath = MODELS_DIR / 'random_forest_model.pkl'
         self.model.save(filepath)
         
-        # Özellik adlarını kaydet
+        # Save feature names for proper column ordering during inference
         np.save(MODELS_DIR / 'feature_names.npy', self.feature_names)
-        logger.info(f"✅ Özellik adları kaydedildi: {MODELS_DIR / 'feature_names.npy'}")
+        logger.info(f"Feature names saved: {MODELS_DIR / 'feature_names.npy'}")
         
     def generate_report(self):
-        """Son raporu oluştur"""
+        """
+        Generate final training report with metrics summary.
+        Writes results to CSV file for record-keeping.
+        """
         
         logger.info("\n" + "="*60)
-        logger.info("ADIM 6: RAPOR OLUŞTURMA")
+        logger.info("STEP 6: REPORT GENERATION")
         logger.info("="*60)
         
         eval_results = self.results['evaluation']
@@ -217,87 +236,80 @@ class RandomForestPipeline:
         report_df.to_csv(LOGS_DIR / 'final_report.csv', index=False)
         
         logger.info("\n" + "-"*60)
-        logger.info("RANDOM FOREST - ÖZET RAPOR")
+        logger.info("RANDOM FOREST - TRAINING SUMMARY")
         logger.info("-"*60)
-        logger.info(f"Doğruluk:      {report['accuracy']:.4f} ✅")
-        logger.info(f"Kesinlik:      {report['precision']:.4f} ✅")
-        logger.info(f"Hatırlanma:    {report['recall']:.4f} ✅")
-        logger.info(f"F1-Score:      {report['f1_score']:.4f} ✅")
-        logger.info(f"Eğitim Verisi: {report['training_samples']} örnek")
-        logger.info(f"Test Verisi:   {report['test_samples']} örnek")
-        logger.info(f"Özellikler:    {report['features']}")
+        logger.info(f"Accuracy:         {report['accuracy']:.4f}")
+        logger.info(f"Precision:        {report['precision']:.4f}")
+        logger.info(f"Recall:           {report['recall']:.4f}")
+        logger.info(f"F1-Score:         {report['f1_score']:.4f}")
+        logger.info(f"Training Samples: {report['training_samples']}")
+        logger.info(f"Test Samples:     {report['test_samples']}")
+        logger.info(f"Features:         {report['features']}")
         logger.info("-"*60)
         
-        logger.info(f"\n✅ Sonuçlar kaydedildi:")
-        logger.info(f"   Modeller: {MODELS_DIR}")
-        logger.info(f"   Loglar:   {LOGS_DIR}")
+        logger.info("\nTraining artifacts saved:")
+        logger.info(f"   Models:  {MODELS_DIR}")
+        logger.info(f"   Logs:    {LOGS_DIR}")
         
     def run_pipeline(self, db_table=None, db_query=None):
         """
-        Training Pipeline - PostgreSQL Database Required
+        Execute complete training pipeline.
+        Orchestrates 6-step process: data prep -> training -> evaluation -> KPI -> save -> report
         
         Parameters:
-        - db_table: Table name to load from database (recommended)
-        - db_query: Custom SQL query (optional alternative)
+            db_table (str): Database table to load from
+            db_query (str): Custom SQL query
         
-        NOTE: Synthetic data is DISABLED. Database connection is MANDATORY.
+        Returns:
+            bool: True if pipeline succeeded, False otherwise
         """
         
         logger.info("\n" + "="*80)
-        logger.info("RANDOM FOREST ARIZA TAHMIN SİSTEMİ (DATABASE MODE)")
+        logger.info("RANDOM FOREST PREDICTIVE MAINTENANCE SYSTEM (DATABASE MODE)")
         logger.info("="*80)
         
         try:
-            # Adım 1: PostgreSQL Veri Hazırlama
+            # Step 1: Data Preparation
             self.prepare_data(db_table=db_table, db_query=db_query)
             
-            # Adım 2: Model Eğitimi
+            # Step 2: Model Training
             self.train_model()
             
-            # Adım 3: Model Değerlendirmesi
+            # Step 3: Model Evaluation
             self.evaluate_model()
             
-            # Adım 4: KPI Hesaplama
+            # Step 4: KPI Calculation
             self.calculate_kpis()
             
-            # Adım 5: Model Kaydetme
+            # Step 5: Model Persistence
             self.save_model()
             
-            # Adım 6: Rapor Oluşturma
+            # Step 6: Report Generation
             self.generate_report()
             
             logger.info("\n" + "="*80)
-            logger.info("✅ PIPELINE BAŞARILI ŞEKILDE TAMAMLANDI!")
+            logger.info("PIPELINE COMPLETED SUCCESSFULLY")
             logger.info("="*80)
             
             return True
             
         except Exception as e:
-            logger.error(f"❌ Pipeline hatası: {str(e)}", exc_info=True)
+            logger.error(f"Pipeline error: {str(e)}", exc_info=True)
             return False
 
 
 def main():
-    """Training Pipeline - PostgreSQL Database Required
+    """
+    Entry point for Random Forest training  system.
     
-    NOTE: Synthetic data is DISABLED. All training uses PostgreSQL database only.
-    Database connection is MANDATORY for the system to work.
+    Database connection is mandatory for all operations.
+    Synthetic data fallback is disabled per system policy.
     """
     
     pipeline = RandomForestPipeline()
     
-    # ========== DATABASE CONFIGURATION ==========
-    # Load from robot_logs_info with is_success flag (inverted to failure)
-    # Based on HATA_KODLARI_ROBOT.xlsx severity - errors as actual failure indicators
+    # Load from database table
     success = pipeline.run_pipeline(
-        db_query="""
-        SELECT 
-          (1 - is_success::int) as failure,
-          check_result_count as error_count,
-          EXTRACT(HOUR FROM task_time)::int as task_hour,
-          EXTRACT(DAY FROM task_time)::int as task_day_of_month,
-          EXTRACT(DOW FROM task_time)::int as task_day_of_week,
-          LENGTH(robot_id)::int as robot_id_length,
           LENGTH(soft_version)::int as software_version_length,
           CASE WHEN product_code LIKE '%PuduBot%' THEN 1
                WHEN product_code LIKE '%KettyBot%' THEN 2
