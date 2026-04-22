@@ -198,11 +198,16 @@ class LSTMModel:
         
         logger.info(" Evaluating LSTM model on test set...")
         
+        # Get test loss
+        test_loss, test_accuracy, test_precision, test_recall = self.model.evaluate(
+            X_test, y_test, verbose=0
+        )
+        
         # Get predictions
         y_pred_prob = self.model.predict(X_test, verbose=0)
         y_pred = (y_pred_prob > 0.5).astype(int).flatten()
         
-        # Calculate metrics
+        # Calculate additional metrics
         from sklearn.metrics import (
             accuracy_score, precision_score, recall_score, f1_score,
             roc_auc_score, confusion_matrix
@@ -217,11 +222,12 @@ class LSTMModel:
         tn, fp, fn, tp = confusion_matrix(y_test, y_pred).ravel()
         
         results = {
+            'loss': float(test_loss),
             'accuracy': accuracy,
             'precision': precision,
             'recall': recall,
             'f1_score': f1,
-            'auc_roc': auc,
+            'auc': auc,
             'true_positives': int(tp),
             'true_negatives': int(tn),
             'false_positives': int(fp),
@@ -231,6 +237,7 @@ class LSTMModel:
         logger.info("\n" + "="*50)
         logger.info("LSTM MODEL EVALUATION")
         logger.info("="*50)
+        logger.info(f"  Loss:      {test_loss:.4f}")
         logger.info(f"  Accuracy:  {accuracy:.4f}")
         logger.info(f"  Precision: {precision:.4f}")
         logger.info(f"  Recall:    {recall:.4f}")

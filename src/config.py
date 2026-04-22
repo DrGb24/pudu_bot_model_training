@@ -36,8 +36,8 @@ DATA_CONFIG = {
         'robot_id_length',
         'software_version_length',
         'product_code_type',
-        'error_severity',
         'hourly_error_rate'
+        # error_severity removed: derived from same error_level as failure target (data leakage)
     ],
 }
 
@@ -57,12 +57,12 @@ KPI_TARGETS = {
 # LSTM Model Configuration
 LSTM_CONFIG = {
     'sequence_length': 10,          # Timesteps in sequence
-    'lstm_units': 128,              # First LSTM layer units
-    'dropout_rate': 0.2,            # Dropout regularization
-    'dense_units': 64,              # First dense layer
-    'learning_rate': 0.001,         # Adam optimizer LR
-    'batch_size': 32,               # Training batch size
-    'epochs': 50,                   # Max epochs (with early stopping)
+    'lstm_units': 64,               # Reduced from 128 (prevent overfitting)
+    'dropout_rate': 0.4,            # Increased from 0.2
+    'dense_units': 32,              # Reduced from 64
+    'learning_rate': 0.0001,        # Keep low for stability
+    'batch_size': 16,               # Reduced from 32 (more updates)
+    'epochs': 100,                  # Max epochs
     'early_stopping_patience': 15,  # Early stopping patience
     'validation_split': 0.15,       # Validation portion
 }
