@@ -83,17 +83,6 @@ HUGGINGFACE_CONFIG = {
     # Splits: 'train' (103,241), 'validation' (22,123), 'test' (22,124)
 }
 
-# Database configuration (PostgreSQL / SQLite)
-DATABASE_CONFIG = {
-    'type': 'postgresql',  # 'postgresql' or 'sqlite'
-    'host': '149.102.155.77',
-    'port': 5433,
-    'database': 'robot_pipeline',
-    'user': 'robot_pipeline_admin',
-    'password': 'RobotPipe!2026#PG!149',
-    'ssl_mode': 'disable',
-}
-
 # Financial parameters
 FINANCIAL_CONFIG = {
     'cost_per_failure': 50000,  # USD

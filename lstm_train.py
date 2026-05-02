@@ -23,7 +23,7 @@ tf.get_logger().setLevel('ERROR')
 
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-from config import DATABASE_CONFIG, DATA_CONFIG, LSTM_CONFIG, HUGGINGFACE_CONFIG
+from config import DATA_CONFIG, LSTM_CONFIG, HUGGINGFACE_CONFIG
 from data_preparation import DataPreparation
 from lstm_models import LSTMModel
 from sklearn.preprocessing import StandardScaler

@@ -3,10 +3,10 @@
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![TensorFlow](https://img.shields.io/badge/TensorFlow-2.13+-orange.svg)](https://www.tensorflow.org/)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-brightgreen.svg)](https://scikit-learn.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Required-336791.svg)](https://www.postgresql.org/)
+[![HuggingFace](https://img.shields.io/badge/Dataset-HuggingFace-yellow.svg)](https://huggingface.co/datasets/Lightcap/pudu-robot-operation-logs-bau-capstone-2026)
 [![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](#)
 
-Production-ready deep learning system for predictive maintenance of industrial robots, trained on **147,488 real robot error logs** from a partitioned PostgreSQL database.
+Production-ready deep learning system for predictive maintenance of industrial robots, trained on **147,488 real robot error logs** sourced from [HuggingFace Datasets](https://huggingface.co/datasets/Lightcap/pudu-robot-operation-logs-bau-capstone-2026).
 
 **LSTM Model**: 98.94% Accuracy | 95.76% Recall | 85.30% Precision | 99.33% AUC-ROC
 
@@ -94,13 +94,18 @@ Regularization:   Dropout (0.4)
 
 ## Dataset
 
-All data comes from a live PostgreSQL database. No synthetic data is used.
+All data is loaded from [HuggingFace Datasets](https://huggingface.co/datasets/Lightcap/pudu-robot-operation-logs-bau-capstone-2026). No synthetic data is used.
 
-| Table | Rows | Purpose |
+```
+Dataset : Lightcap/pudu-robot-operation-logs-bau-capstone-2026
+Config  : partitioned_error_logs
+```
+
+| Split | Rows | Purpose |
 |-------|------|---------|
-| `robot_logs_error_training` | 103,241 | Model training |
-| `robot_logs_error_validation` | 22,123 | Hyperparameter tuning / early stopping |
-| `robot_logs_error_test` | 22,124 | Final evaluation |
+| `train` | 103,241 | Model training |
+| `validation` | 22,123 | Hyperparameter tuning / early stopping |
+| `test` | 22,124 | Final evaluation |
 | **Total** | **147,488** | - |
 
 ### Input Features (8 features)
@@ -133,8 +138,8 @@ project/
 ├── rf_inference.py                      Random Forest inference
 │
 ├── src/
-│   ├── config.py                        Centralized configuration & DB credentials
-│   ├── data_preparation.py              Data loading from PostgreSQL
+│   ├── config.py                        Centralized configuration & HuggingFace settings
+│   ├── data_preparation.py              Data loading from HuggingFace Datasets
 │   └── lstm_models.py                   LSTMModel class (build, train, evaluate, save)
 │
 ├── models/
@@ -159,7 +164,7 @@ python lstm_train.py
 ```
 
 The training pipeline executes 7 steps:
-1. Load data from 3 partitioned database tables
+1. Load data from HuggingFace (train / validation / test splits)
 2. Feature engineering (23 raw columns to 8 features + binary target)
 3. Create sequences (10 timesteps per sample)
 4. Normalize features with StandardScaler
@@ -206,7 +211,8 @@ scikit-learn>=1.3
 pandas>=2.0
 numpy>=1.24
 joblib>=1.3
-psycopg2-binary>=2.9
+datasets>=2.14
+huggingface_hub>=0.20
 python-dotenv>=1.0
 matplotlib>=3.7
 seaborn>=0.12
@@ -216,19 +222,15 @@ Install: `pip install -r requirements.txt`
 
 ---
 
-## Database Configuration
+## Dataset Configuration
 
-Set credentials in `src/config.py`:
+Dataset source is set in `src/config.py`:
 
 ```python
-DATABASE_CONFIG = {
-    'type': 'postgresql',
-    'host': '<host>',
-    'port': 5433,
-    'database': 'robot_pipeline',
-    'user': '<user>',
-    'password': '<password>',
+HUGGINGFACE_CONFIG = {
+    'repo_id': 'Lightcap/pudu-robot-operation-logs-bau-capstone-2026',
+    'config_name': 'partitioned_error_logs',
 }
 ```
 
-A live database connection is **required** for training. Inference uses the saved model files and does not need a database connection.
+No database connection is required. Data is streamed directly from HuggingFace. Inference uses the saved model files only.
