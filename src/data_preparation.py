@@ -43,6 +43,36 @@ class DataPreparation:
             logger.error(f"File not found: {filepath}")
             raise
     
+    def load_from_huggingface(self, hf_config, split):
+        """
+        Load data from HuggingFace dataset.
+
+        Parameters:
+        - hf_config: Dictionary with HuggingFace settings
+          {
+            'repo_id': 'Lightcap/pudu-robot-operation-logs-bau-capstone-2026',
+            'config_name': 'partitioned_error_logs',
+          }
+        - split: 'train', 'validation', or 'test'
+
+        Returns:
+        - DataFrame with loaded data (same 23-column schema as PostgreSQL tables)
+        """
+        try:
+            from datasets import load_dataset
+        except ImportError:
+            logger.error("datasets library not installed. Install with: pip install datasets")
+            raise ImportError("datasets library required for HuggingFace loading")
+
+        repo_id     = hf_config['repo_id']
+        config_name = hf_config['config_name']
+
+        logger.info(f"Loading '{split}' split from HuggingFace: {repo_id} [{config_name}]...")
+        dataset = load_dataset(repo_id, config_name, split=split)
+        df = dataset.to_pandas()
+        logger.info(f"   Data loaded successfully. Shape: {df.shape}")
+        return df
+
     def load_from_database(self, db_config, query=None, table_name=None):
         """
         Load data from PostgreSQL database

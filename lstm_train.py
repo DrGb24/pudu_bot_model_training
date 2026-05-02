@@ -23,7 +23,7 @@ tf.get_logger().setLevel('ERROR')
 
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 
-from config import DATABASE_CONFIG, DATA_CONFIG, LSTM_CONFIG
+from config import DATABASE_CONFIG, DATA_CONFIG, LSTM_CONFIG, HUGGINGFACE_CONFIG
 from data_preparation import DataPreparation
 from lstm_models import LSTMModel
 from sklearn.preprocessing import StandardScaler
@@ -82,27 +82,27 @@ class LSTMTrainer:
         
         try:
             # Load training data
-            logger.info("\nLoading training data from robot_logs_error_training...")
-            self.train_data = self.data_prep.load_from_database(
-                DATABASE_CONFIG,
-                table_name='robot_logs_error_training'
+            logger.info("\nLoading training data from HuggingFace (split=train)...")
+            self.train_data = self.data_prep.load_from_huggingface(
+                HUGGINGFACE_CONFIG,
+                split='train'
             )
             logger.info(f"   Training data shape: {self.train_data.shape}")
             logger.info(f"   Columns: {list(self.train_data.columns)}")
-            
+
             # Load validation data
-            logger.info("\nLoading validation data from robot_logs_error_validation...")
-            self.val_data = self.data_prep.load_from_database(
-                DATABASE_CONFIG,
-                table_name='robot_logs_error_validation'
+            logger.info("\nLoading validation data from HuggingFace (split=validation)...")
+            self.val_data = self.data_prep.load_from_huggingface(
+                HUGGINGFACE_CONFIG,
+                split='validation'
             )
             logger.info(f"   Validation data shape: {self.val_data.shape}")
             
             # Load test data
-            logger.info("\nLoading test data from robot_logs_error_test...")
-            self.test_data = self.data_prep.load_from_database(
-                DATABASE_CONFIG,
-                table_name='robot_logs_error_test'
+            logger.info("\nLoading test data from HuggingFace (split=test)...")
+            self.test_data = self.data_prep.load_from_huggingface(
+                HUGGINGFACE_CONFIG,
+                split='test'
             )
             logger.info(f"   Test data shape: {self.test_data.shape}")
             

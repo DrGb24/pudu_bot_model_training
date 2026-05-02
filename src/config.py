@@ -76,6 +76,13 @@ RF_CONFIG = {
     'n_jobs': -1,
 }
 
+# HuggingFace dataset configuration
+HUGGINGFACE_CONFIG = {
+    'repo_id': 'Lightcap/pudu-robot-operation-logs-bau-capstone-2026',
+    'config_name': 'partitioned_error_logs',
+    # Splits: 'train' (103,241), 'validation' (22,123), 'test' (22,124)
+}
+
 # Database configuration (PostgreSQL / SQLite)
 DATABASE_CONFIG = {
     'type': 'postgresql',  # 'postgresql' or 'sqlite'
