@@ -83,6 +83,19 @@ HUGGINGFACE_CONFIG = {
     # Splits: 'train' (103,241), 'validation' (22,123), 'test' (22,124)
 }
 
+# LSTM V2 — Multi-Output Model Configuration
+LSTM_V2_CONFIG = {
+    'sequence_length':         10,    # Timesteps per input sequence
+    'lstm_units':             128,    # First LSTM layer units (second = units//2)
+    'dropout_rate':           0.3,    # Dropout after each LSTM layer
+    'dense_units':             64,    # Shared dense layer units
+    'learning_rate':       0.0001,    # Adam learning rate
+    'batch_size':              16,    # Training batch size
+    'epochs':                 100,    # Maximum epochs (early stopping applies)
+    'early_stopping_patience': 15,    # Patience for EarlyStopping
+    'future_window':          168,    # Look-ahead hours for future failure targets (7 days)
+}
+
 # Financial parameters
 FINANCIAL_CONFIG = {
     'cost_per_failure': 50000,  # USD
