@@ -126,41 +126,41 @@ fleet = engine.fleet_report(robot_dfs={'id1': df1, 'id2': df2})
 
 ```
 ============================================================
-  ROBOT DURUM RAPORU — T-1: 2026-02-25
-  Robot ID   : 8110K4529050001
+  ROBOT DURUM RAPORU — T-1: 2026-01-14
+  Robot ID   : ROBOT-XXXX-001
   Genel Risk : YÜKSEK 🔴
 ============================================================
 
   [1] ANLÍK DURUM  (T-1 gününe ait son log)
   ├─ Durum          : BAKIM GEREKTİRİYOR ⚠️
-  ├─ Arıza olasılığı: %88.4
-  ├─ Aktif hatalar  : CanNotReach, WheelErrorLeft
-  └─ Hata kategorisi: Navigasyon, Hareket
+  ├─ Arıza olasılığı: %82.7
+  ├─ Aktif hatalar  : HataKodu_A, HataKodu_B
+  └─ Hata kategorisi: Kategori-1, Kategori-2
 
   [HATA DETAYLARI]
   │
-  ├─ Hata Kodu   : CanNotReach
-  │  Sınıf       : Lokasyon Kayıpları
+  ├─ Hata Kodu   : HataKodu_A
+  │  Sınıf       : Örnek Arıza Sınıfı
   │  Destek Tipi : 🔧 Yerinde destek gerekli
-  │  Çözüm       : Hardware hatası, yerinde kontrol gereklidir.
+  │  Çözüm       : İlgili bileşen kontrol edilmeli, gerekirse sıfırlama yapılmalı.
   │
-  ├─ Hata Kodu   : WheelErrorLeft
-  │  Sınıf       : Tekerlek anormalliği
-  │  Destek Tipi : 🔧 Yerinde destek gerekli
-  │  Çözüm       : Robotu remote terminal üzerinden kapatıp aç...
+  ├─ Hata Kodu   : HataKodu_B
+  │  Sınıf       : Örnek Arıza Sınıfı 2
+  │  Destek Tipi : 📞 Uzaktan destek
+  │  Çözüm       : Sistem logları incelenmeli, uzaktan müdahale denenebilir.
   │
 
   [2] ARIZA ŞİDDETİ
   ├─ Mevcut şiddet  : Hata (Error)
-  └─ Dağılım        : Event: %0 | Warning: %1 | Error: %97 | Fatal: %2
+  └─ Dağılım        : Event: %2 | Warning: %5 | Error: %88 | Fatal: %5
 
   [3] BAKIM / TAMİR GEREKSİNİMİ
-  ├─ 7 günlük arıza ihtim.: %88.4
-  ├─ Maksimum pencere iht.: %98.6
+  ├─ 7 günlük arıza ihtim.: %82.7
+  ├─ Maksimum pencere iht.: %95.1
   └─ YÜKSEK ihtimalle bakım gerekecek
 
   [4] TAHMİNİ ARIZA ZAMANI (T-1'den itibaren)
-  └─ ⚠️  ~18 saat içinde hata bekleniyor
+  └─ ⚠️  ~24 saat içinde hata bekleniyor
 ============================================================
 ```
 
