@@ -39,9 +39,19 @@ wheels/
 logs/
 *.log.*
 
-# Data & Models (optional - uncomment if needed)
-# data/
-# models/*.pkl
+# Data & Models
+data/
+models/
+notebooks/
+*.pkl
+*.h5
+*.weights.h5
+*.npy
+
+# Temp / output files
+excel_out.txt
+output_test.txt
+_*.py
 
 # Environment variables
 .env

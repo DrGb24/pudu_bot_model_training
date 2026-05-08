@@ -1,236 +1,217 @@
-# Predictive Maintenance System - PUDU Robot LSTM
+# PUDU Robot Prediktif Bakım Sistemi
 
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://www.python.org/downloads/)
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.13+-orange.svg)](https://www.tensorflow.org/)
-[![scikit-learn](https://img.shields.io/badge/scikit--learn-1.3+-brightgreen.svg)](https://scikit-learn.org/)
-[![HuggingFace](https://img.shields.io/badge/Dataset-HuggingFace-yellow.svg)](https://huggingface.co/datasets/Lightcap/pudu-robot-operation-logs-bau-capstone-2026)
-[![Status](https://img.shields.io/badge/Status-Production%20Ready-brightgreen.svg)](#)
+[![TensorFlow 2.13+](https://img.shields.io/badge/TensorFlow-2.13+-orange.svg)](https://www.tensorflow.org/)
+[![HuggingFace Dataset](https://img.shields.io/badge/Dataset-HuggingFace-yellow.svg)](https://huggingface.co/datasets/Lightcap/pudu-robot-operation-logs-bau-capstone-2026)
 
-Production-ready deep learning system for predictive maintenance of industrial robots, trained on **147,488 real robot error logs** sourced from [HuggingFace Datasets](https://huggingface.co/datasets/Lightcap/pudu-robot-operation-logs-bau-capstone-2026).
-
-**LSTM Model**: 98.94% Accuracy | 95.76% Recall | 85.30% Precision | 99.33% AUC-ROC
+PUDU servis robotları için çok çıktılı LSTM tabanlı prediktif bakım sistemi.
+**103.241 gerçek robot hata logu** ile eğitilmiş; anlık durum, arıza şiddeti, 7 günlük öngörü ve tahmini arıza süresi çıktıları üretir.
 
 ---
 
-## Quick Start
-
-```bash
-git clone https://github.com/DrGb24/pudu_bot_model_training.git
-cd pudu_bot_model_training
-python -m venv venv
-venv\Scripts\activate   # Windows
-pip install -r requirements.txt
-```
-
-### Train the Model
-```bash
-python lstm_train.py
-```
-
-### Run Inference
-```bash
-python lstm_inference_partitioned.py
-```
-
----
-
-## Model Performance
-
-Evaluated on **22,124 held-out test samples** (from `robot_logs_error_test` table):
-
-| Metric | Result | Target |
-|--------|--------|--------|
-| **Accuracy** | 98.94% | >=95% |
-| **Recall** | 95.76% | >=85% |
-| **Precision** | 85.30% | >=80% |
-| **F1-Score** | 90.23% | >=80% |
-| **AUC-ROC** | 99.33% | - |
-| **Loss** | 0.0603 | - |
-
-### Confusion Matrix (Test Set)
-```
-True Positives:   1,085   (failures correctly detected)
-True Negatives:  20,795   (normal operation correctly identified)
-False Positives:    187   (false alarms)
-False Negatives:     48   (missed failures)
-```
-
----
-
-## Architecture
-
-### LSTM Model
-```
-Input: 10 timesteps x 8 features
-            |
-Bidirectional LSTM Layer 1 (64 units, dropout=0.4)
-            |
-Bidirectional LSTM Layer 2 (32 units, dropout=0.4)
-            |
-Bidirectional LSTM Layer 3 (16 units, dropout=0.4)
-            |
-Dense Layer: 32 units, ReLU activation
-            |
-Output Layer: 1 unit, Sigmoid (failure probability)
-
-Total Parameters: 33,505
-Loss Function:    Binary Crossentropy
-Optimizer:        Adam (learning_rate=0.0001)
-Regularization:   Dropout (0.4)
-```
-
-### Training Configuration
-| Parameter | Value |
-|-----------|-------|
-| Sequence Length | 10 timesteps |
-| Batch Size | 16 |
-| Max Epochs | 100 (early stopping patience=15) |
-| Learning Rate | 0.0001 |
-| Training Samples | 103,241 |
-| Validation Samples | 22,123 |
-| Test Samples | 22,124 |
-
----
-
-## Dataset
-
-All data is loaded from [HuggingFace Datasets](https://huggingface.co/datasets/Lightcap/pudu-robot-operation-logs-bau-capstone-2026). No synthetic data is used.
-
-```
-Dataset : Lightcap/pudu-robot-operation-logs-bau-capstone-2026
-Config  : partitioned_error_logs
-```
-
-| Split | Rows | Purpose |
-|-------|------|---------|
-| `train` | 103,241 | Model training |
-| `validation` | 22,123 | Hyperparameter tuning / early stopping |
-| `test` | 22,124 | Final evaluation |
-| **Total** | **147,488** | - |
-
-### Input Features (8 features)
-```
-1. error_count              - Hourly error count
-2. task_hour_num            - Hour of the task (0-23)
-3. day_of_month             - Day of month (1-31)
-4. day_of_week              - Day of week (0=Monday)
-5. robot_id_length          - Length of robot identifier string
-6. software_version_length  - Length of software version string
-7. product_code_type        - Encoded product model (1-5)
-8. hourly_error_rate        - Error rate per hour
-```
-
-### Target Variable
-```
-failure = 1  ->  error_level is "Error" or "Critical"
-failure = 0  ->  error_level is "Event" or "Warning"
-```
-
----
-
-## Project Structure
+## Proje Yapısı
 
 ```
 project/
-├── lstm_train.py                        Training pipeline (partitioned DB tables)
-├── lstm_inference_partitioned.py        Inference engine
-├── rf_train.py                          Random Forest training (backup model)
-├── rf_inference.py                      Random Forest inference
-│
+├── lstm_train_v2.py          # Model eğitim pipeline'ı (10 adım)
+├── lstm_inference_v2.py      # Tahmin motoru + robot raporu üretimi
+├── HATA_KODLARI_ROBOT.xlsx   # Hata kodu → destek tipi / çözüm tablosu (119 kayıt)
+├── requirements.txt
 ├── src/
-│   ├── config.py                        Centralized configuration & HuggingFace settings
-│   ├── data_preparation.py              Data loading from HuggingFace Datasets
-│   └── lstm_models.py                   LSTMModel class (build, train, evaluate, save)
-│
-├── models/
-│   └── lstm/
-│       ├── lstm_partitioned.h5          Trained model weights
-│       ├── lstm_scaler_partitioned.pkl  StandardScaler (fitted on training data)
-│       └── lstm_config_partitioned.json Model metadata & architecture config
-│
-├── logs/
-│   └── lstm_training_report.txt         Training report with full metrics
-│
-└── requirements.txt
+│   ├── lstm_models_v2.py     # MultiOutputLSTMModel mimarisi
+│   └── config.py             # Merkezi konfigürasyon (HuggingFace, LSTM_V2_CONFIG)
+└── models/lstm_v2/           # Eğitilmiş model dosyaları (git'e dahil değil)
+    ├── lstm_v2_weights.weights.h5
+    ├── lstm_v2_config.json
+    └── lstm_v2_scaler.pkl
 ```
 
 ---
 
-## Usage
+## Model Mimarisi — LSTM V2
 
-### Training
+**Tip:** Keras Functional API — Çok çıktılı LSTM
+**Parametre sayısı:** 132.775
+
+| Çıktı (Head) | Görev | Tip |
+|---|---|---|
+| Head 1 | Anlık arıza tespiti | Binary sınıflandırma |
+| Head 2 | Arıza şiddeti (Event/Warning/Error/Fatal) | 4-sınıflı sınıflandırma |
+| Head 3 | 7 günlük arıza olasılığı | Regresyon [0–1] |
+| Head 4 | Tahmini arıza süresi (0–168 saat) | Regresyon |
+
+**Eğitim Verisi:**
+- Kaynak: `Lightcap/pudu-robot-operation-logs-bau-capstone-2026` (HuggingFace)
+- Config: `partitioned_error_logs` — 103.241 satır, 46 robot
+- Giriş: 10 adımlı zaman serisi, 9 özellik
+- Bölünme: %80 eğitim / %20 test
+
+**Eğitim Sonuçları:**
+
+| Head | Metrik | Sonuç |
+|---|---|---|
+| Head 1 — Anlık arıza | Accuracy / F1 / AUC | %99.4 / %94.8 / %99.9 ✅ |
+| Head 2 — Şiddet | Accuracy | %98.6 ✅ |
+| Head 3 — 7 günlük öngörü | AUC | %80.5 |
+| Head 4 — Arıza süresi | MAE | 19.7 saat |
+
+---
+
+## Kurulum
+
 ```bash
-python lstm_train.py
-```
+# Sanal ortam oluştur ve aktif et
+python -m venv venv
+venv\Scripts\activate          # Windows
+source venv/bin/activate       # Linux/Mac
 
-The training pipeline executes 7 steps:
-1. Load data from HuggingFace (train / validation / test splits)
-2. Feature engineering (23 raw columns to 8 features + binary target)
-3. Create sequences (10 timesteps per sample)
-4. Normalize features with StandardScaler
-5. Build and train LSTM model
-6. Evaluate on held-out test set
-7. Save model, scaler, config, and report
-
-### Inference
-```python
-from lstm_inference_partitioned import LSTMPartitionedInference
-
-inference = LSTMPartitionedInference()
-
-robot_data = {
-    'error_count': 5,
-    'task_hour_num': 14,
-    'day_of_month': 22,
-    'day_of_week': 1,
-    'robot_id_length': 8,
-    'software_version_length': 12,
-    'product_code_type': 2,
-    'hourly_error_rate': 0.08
-}
-
-result = inference.predict(robot_data)
-print(f"Failure probability: {result['probability']:.4f}")
-print(f"Risk level: {result['risk_level']}")
-```
-
-### Risk Levels
-```
-LOW:    Probability < 0.40   - Safe to operate
-MEDIUM: 0.40 <= P < 0.70    - Monitor closely
-HIGH:   Probability >= 0.70  - Maintenance urgent
+# Bağımlılıkları yükle
+pip install -r requirements.txt
 ```
 
 ---
 
-## Dependencies
+## Kullanım
+
+### Model Eğitimi
+
+```bash
+python lstm_train_v2.py
+```
+
+HuggingFace'den veriyi çeker, 10 adımlı pipeline ile eğitir, `models/lstm_v2/` altına kaydeder.
+
+### Robot Raporu Üretimi (Tüm Filo)
+
+```bash
+# Windows
+set PYTHONIOENCODING=utf-8
+python lstm_inference_v2.py
+```
+
+46 robot için T-1 tarihi baz alınarak Türkçe rapor üretilir.
+
+### Python API
+
+```python
+from lstm_inference_v2 import LSTMInferenceV2
+import pandas as pd
+
+engine = LSTMInferenceV2()  # model + hata kodu tablosunu yükler
+
+# Tek robot tahmini
+result = engine.predict_for_robot(robot_id='8110K...', robot_df=robot_df)
+print(result['risk_level'])       # YUKSEK / ORTA / DUSUK
+print(result['error_details'])    # Excel'den destek tipi + çözüm
+
+# İnsan okunabilir Türkçe rapor
+report = engine.robot_report(robot_id='8110K...', robot_df=robot_df)
+print(report)
+
+# Tüm filo raporu
+fleet = engine.fleet_report(robot_dfs={'id1': df1, 'id2': df2})
+```
+
+---
+
+## Robot Raporu Formatı
+
+```
+============================================================
+  ROBOT DURUM RAPORU — T-1: 2026-02-25
+  Robot ID   : 8110K4529050001
+  Genel Risk : YÜKSEK 🔴
+============================================================
+
+  [1] ANLÍK DURUM  (T-1 gününe ait son log)
+  ├─ Durum          : BAKIM GEREKTİRİYOR ⚠️
+  ├─ Arıza olasılığı: %88.4
+  ├─ Aktif hatalar  : CanNotReach, WheelErrorLeft
+  └─ Hata kategorisi: Navigasyon, Hareket
+
+  [HATA DETAYLARI]
+  │
+  ├─ Hata Kodu   : CanNotReach
+  │  Sınıf       : Lokasyon Kayıpları
+  │  Destek Tipi : 🔧 Yerinde destek gerekli
+  │  Çözüm       : Hardware hatası, yerinde kontrol gereklidir.
+  │
+  ├─ Hata Kodu   : WheelErrorLeft
+  │  Sınıf       : Tekerlek anormalliği
+  │  Destek Tipi : 🔧 Yerinde destek gerekli
+  │  Çözüm       : Robotu remote terminal üzerinden kapatıp aç...
+  │
+
+  [2] ARIZA ŞİDDETİ
+  ├─ Mevcut şiddet  : Hata (Error)
+  └─ Dağılım        : Event: %0 | Warning: %1 | Error: %97 | Fatal: %2
+
+  [3] BAKIM / TAMİR GEREKSİNİMİ
+  ├─ 7 günlük arıza ihtim.: %88.4
+  ├─ Maksimum pencere iht.: %98.6
+  └─ YÜKSEK ihtimalle bakım gerekecek
+
+  [4] TAHMİNİ ARIZA ZAMANI (T-1'den itibaren)
+  └─ ⚠️  ~18 saat içinde hata bekleniyor
+============================================================
+```
+
+### Durum Etiketleri
+
+| Etiket | Koşul |
+|---|---|
+| `ARIZALI ⛔` | Fatal seviyeli hata **VEYA** Error + arıza olasılığı ≥ %80 |
+| `BAKIM GEREKTİRİYOR ⚠️` | Error seviyeli hata **VEYA** arıza olasılığı ≥ %55 + aktif hata |
+| `TAKİPTE 🔶` | Warning seviyeli hata **VEYA** arıza olasılığı ≥ %30 + aktif hata |
+| `ÇALIŞIR DURUMDA ✓` | Yukarıdaki koşulların hiçbiri |
+
+### Genel Risk Seviyeleri
+
+| Seviye | Eşik |
+|---|---|
+| `YÜKSEK 🔴` | max(anlık olasılık, 0.7 × 7 günlük olasılık) ≥ %70 |
+| `ORTA 🟡` | ≥ %40 |
+| `DÜŞÜK 🟢` | < %40 |
+
+---
+
+## Hata Kodu Tablosu (HATA_KODLARI_ROBOT.xlsx)
+
+119 hata kodu kayıtlıdır. Her kayıt için:
+
+- **Arıza sınıflandırması** — Başlatma, Tekerlek, Navigasyon, Temizlik vb.
+- **Destek tipi** — 🔧 Yerinde destek gerekli / 📞 Uzaktan destek
+- **Çözüm metodu** — Teknisyen talimatı (Türkçe)
+
+Raporda her aktif hata kodu için otomatik olarak ilgili destek tipi ve çözüm adımları gösterilir.
+
+---
+
+## T-1 Referans Tarihi Mantığı
+
+Sistem, raporları **T-1** (bir gün önceki) baz alarak üretir:
+
+```
+T   = max(task_time in dataset)   → veri son tarihi
+T-1 = T − 1 gün                  → analiz referans tarihi
+```
+
+Bu sayede son günün tamamlanmış log verisi üzerinden karar üretilir.
+
+---
+
+## Bağımlılıklar
 
 ```
 tensorflow>=2.13
-scikit-learn>=1.3
-pandas>=2.0
-numpy>=1.24
-joblib>=1.3
-datasets>=2.14
-huggingface_hub>=0.20
-python-dotenv>=1.0
-matplotlib>=3.7
-seaborn>=0.12
+keras>=3.0
+scikit-learn
+pandas
+numpy
+joblib
+datasets          # HuggingFace
+openpyxl          # Excel okuma (.xlsx)
 ```
 
-Install: `pip install -r requirements.txt`
+Tam liste: `requirements.txt`
 
----
-
-## Dataset Configuration
-
-Dataset source is set in `src/config.py`:
-
-```python
-HUGGINGFACE_CONFIG = {
-    'repo_id': 'Lightcap/pudu-robot-operation-logs-bau-capstone-2026',
-    'config_name': 'partitioned_error_logs',
-}
-```
-
-No database connection is required. Data is streamed directly from HuggingFace. Inference uses the saved model files only.
