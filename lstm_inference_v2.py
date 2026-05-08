@@ -17,14 +17,45 @@ For each 10-step input sequence, returns:
 import json
 import logging
 import numpy as np
+import pandas as pd
 import joblib
 from pathlib import Path
 import sys
+from datetime import datetime
 
 sys.path.insert(0, str(Path(__file__).parent / 'src'))
 from lstm_models_v2 import (
     MultiOutputLSTMModel, SEVERITY_LABELS, SEVERITY_LABELS_TR, FUTURE_WINDOW_HOURS
 )
+
+# Error type → category mapping (same as training)
+ERROR_CATEGORY_MAP = {
+    'NavigationStuck': 1, 'NavigationStopAdvance': 1, 'NavigationSpeedLimit': 1,
+    'PlanOverTime': 1, 'PlanFailOverTime': 1, 'ReplanError': 1,
+    'CanNotReach': 1, 'PoseNotInit': 1, 'ScheduleAlgoError': 1, 'TaskCannotStart': 1,
+    'LostLocalization': 2, 'LostIMU': 2, 'LostEncoder': 2, 'LostRGBD': 2,
+    'LostBattery': 2, 'LostLidar': 2, 'LostCAN': 2, 'LostCamera': 2,
+    'Lostultrasonic': 2, 'Sensor': 2,
+    'MotionError': 3, 'WheelErrorLeft': 3, 'WheelErrorRight': 3,
+    'FailEscapeMotorStuck': 3, 'FailEscapeSlip': 3, 'FailEscapeBumperStripTrigger': 3,
+    'ChargingPlugError': 4, 'LackOfPower': 4, 'batteryConnectError': 4, 'charge': 4,
+    'MapConfigError': 5, 'SelfStateMonitor': 5, 'FallDropV3': 5, 'Costmap': 5, 'StixelDetect': 5,
+    'BrushError': 6, 'DustAbsorptionError': 6, 'DustMopError': 6, 'DustReductionError': 6,
+    'ErrorOfAddWater': 6, 'ErrorOfDrainSewage': 6, 'FullOfSewage': 6, 'LackOfWater': 6,
+    'FlowMeterError': 6, 'RightEdgeSwipeError': 6, 'UndulateError': 6,
+    'CommunicationError': 7, 'InternalError': 7, 'ReflectorDropError': 7,
+    'CoverPlate': 7, 'Filter': 7, 'Handrail': 7, 'Screen': 7,
+    'FailedToCall': 7, 'FailedToEnter': 7,
+}
+
+ERROR_CATEGORY_LABELS = {
+    0: 'Bilinmiyor', 1: 'Navigasyon', 2: 'Sensör Kaybı', 3: 'Hareket',
+    4: 'Güç/Batarya', 5: 'Harita/Durum', 6: 'Temizlik', 7: 'Donanım/İletişim',
+}
+
+PRODUCT_MAP   = {'PuduBot2': 1, 'KettyBot': 2, 'Bellabot': 3, 'BellaBotPro': 3, 'CC': 4, 'CC1': 4}
+SEVERITY_MAP  = {'Event': 0, 'Warning': 1, 'Error': 2, 'Fatal': 3, 'Critical': 2}
+FAILURE_LEVELS = {'Error', 'Fatal', 'Critical'}
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +92,7 @@ class LSTMInferenceV2:
         # Build architecture and load weights
         self.lstm_model = MultiOutputLSTMModel(self.config)
         self.lstm_model.build_model(self.input_shape, n_severity_classes=4)
-        self.lstm_model.model.load_weights(str(model_dir / 'lstm_v2_weights.h5'))
+        self.lstm_model.model.load_weights(str(model_dir / 'lstm_v2_weights.weights.h5'))
 
         # Load fitted scaler
         self.scaler = joblib.load(model_dir / 'lstm_v2_scaler.pkl')
@@ -198,53 +229,229 @@ class LSTMInferenceV2:
             ],
         }
 
+    # ── Robot-level inference ─────────────────────────────────────────────────
+    def _engineer_robot_features(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Feature engineering for a single robot's DataFrame (mirrors training)."""
+        df = df.copy()
+        df['task_time']  = pd.to_datetime(df['task_time'])
+        df['task_hour']  = pd.to_datetime(df['task_hour'])
+        df = df.sort_values('task_time').reset_index(drop=True)
 
-# ── Quick demo ────────────────────────────────────────────────────────────────
+        df['task_hour_num']           = df['task_hour'].dt.hour
+        df['day_of_month']            = df['task_time'].dt.day
+        df['day_of_week']             = df['task_time'].dt.dayofweek
+        df['error_count']             = df['hourly_error_count']
+        df['hourly_error_rate']       = df['hourly_ratio']
+        df['robot_id_length']         = df['robot_id'].astype(str).str.len()
+        df['software_version_length'] = df['soft_version'].astype(str).str.len()
+        df['product_code_type']       = df['product_code'].map(PRODUCT_MAP).fillna(5).astype(int)
+        df['error_category']          = df['error_type'].map(ERROR_CATEGORY_MAP).fillna(0).astype(int)
+
+        for col in FEATURE_COLUMNS:
+            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+            df[col] = df[col].replace([np.inf, -np.inf], 0)
+
+        return df
+
+    def _make_sequences(self, df: pd.DataFrame):
+        """Sliding window → (sequences array, last-step raw rows)."""
+        seq_len = self.input_shape[0]
+        n = len(df)
+        if n < seq_len:
+            # Pad with first row if not enough data
+            pad = pd.concat([df.iloc[[0]] * (seq_len - n), df], ignore_index=True)
+            X = pad[FEATURE_COLUMNS].values[np.newaxis, ...]
+            last_rows = [df.iloc[-1]]
+        else:
+            X = np.stack([
+                df[FEATURE_COLUMNS].values[i: i + seq_len]
+                for i in range(n - seq_len + 1)
+            ])
+            last_rows = [df.iloc[i + seq_len - 1] for i in range(n - seq_len + 1)]
+        return X.astype(np.float32), last_rows
+
+    def predict_for_robot(self, robot_id: str, robot_df: pd.DataFrame) -> dict:
+        """
+        Given a robot's log DataFrame, return aggregated predictions.
+
+        Parameters
+        ----------
+        robot_id  : str — robot identifier (for reporting)
+        robot_df  : pd.DataFrame — raw log rows for this robot
+                    Must contain: task_time, task_hour, hourly_error_count,
+                    hourly_ratio, robot_id, soft_version, product_code,
+                    error_type, error_level
+
+        Returns
+        -------
+        dict with per-robot aggregated predictions
+        """
+        df = self._engineer_robot_features(robot_df)
+        X, last_rows = self._make_sequences(df)
+
+        # Scale
+        s = X.shape
+        scaled = self.scaler.transform(X.reshape(-1, s[-1])).reshape(s).astype(np.float32)
+        scaled = np.nan_to_num(scaled, nan=0.0, posinf=6.0, neginf=-6.0)
+
+        preds = self.lstm_model.model.predict(scaled, verbose=0)
+        p_failures   = preds[0].flatten()
+        p_severities = preds[1]            # (N, 4)
+        p_futures    = preds[2].flatten()
+        p_times      = preds[3].flatten()  # normalized
+
+        # ── HEAD 1: current state = last sequence prediction ──────────────
+        p_now     = float(p_failures[-1])
+        is_fail   = p_now >= 0.5
+
+        # Aktif hata tipleri (son N satırdan gerçek error_level bazlı)
+        recent_df      = df.tail(self.input_shape[0])
+        active_errors  = recent_df[recent_df['error_level'].isin(FAILURE_LEVELS)]['error_type'].unique().tolist()
+        active_cats    = [ERROR_CATEGORY_LABELS.get(
+            int(ERROR_CATEGORY_MAP.get(e, 0)), 'Bilinmiyor') for e in active_errors]
+        active_cats    = list(dict.fromkeys(active_cats))  # deduplicate
+
+        # ── HEAD 2: severity = last sequence ──────────────────────────────
+        sev_idx    = int(np.argmax(p_severities[-1]))
+        sev_label  = SEVERITY_LABELS.get(sev_idx, 'Unknown')
+        sev_tr     = SEVERITY_LABELS_TR.get(sev_idx, 'Bilinmiyor')
+        sev_scores = p_severities[-1].tolist()  # probabilities per class
+
+        # ── HEAD 3: monthly repair probability = max future_prob over all seqs ──
+        p_future_max = float(np.max(p_futures))
+        p_future_now = float(p_futures[-1])
+
+        # ── HEAD 4: soonest predicted failure (minimum hours) ────────────────
+        min_time_norm = float(np.min(p_times))
+        est_hours     = round(min_time_norm * self.future_window, 1)
+        est_days      = round(est_hours / 24, 2)
+
+        risk = self._risk_level(p_now, p_future_max)
+
+        return {
+            'robot_id': robot_id,
+            # Head 1
+            'is_failure_now':    is_fail,
+            'failure_prob_now':  round(p_now, 4),
+            'active_error_types': active_errors,
+            'active_error_categories': active_cats,
+            # Head 2
+            'severity_now':      sev_label,
+            'severity_now_tr':   sev_tr,
+            'severity_score':    sev_idx,
+            'severity_probs':    {SEVERITY_LABELS[i]: round(sev_scores[i], 3) for i in range(4)},
+            # Head 3
+            'monthly_repair_prob': round(p_future_max, 4),
+            'next_7d_fail_prob':   round(p_future_now, 4),
+            # Head 4
+            'est_hours_to_failure': est_hours,
+            'est_days_to_failure':  est_days,
+            # Summary
+            'risk_level': risk,
+        }
+
+    def robot_report(self, robot_id: str, robot_df: pd.DataFrame) -> str:
+        """
+        Generate a human-readable Turkish report for a single robot.
+        """
+        r   = self.predict_for_robot(robot_id, robot_df)
+        now = datetime.now().strftime('%Y-%m-%d %H:%M')
+
+        durum    = 'ARIZALI ⚠️' if r['is_failure_now'] else 'NORMAL ✓'
+        hata_str = ', '.join(r['active_error_types']) if r['active_error_types'] else 'Yok'
+        kat_str  = ', '.join(r['active_error_categories']) if r['active_error_categories'] else 'Yok'
+
+        sev_bar = ' | '.join(
+            f"{k}: %{v*100:.0f}" for k, v in r['severity_probs'].items()
+        )
+
+        aylik = r['monthly_repair_prob'] * 100
+        if aylik >= 70:
+            aylik_yorum = 'YÜKSEK ihtimalle bakım gerekecek'
+        elif aylik >= 40:
+            aylik_yorum = 'Bakım gerekebilir, takip edilmeli'
+        else:
+            aylik_yorum = 'Bakım gereksinimi düşük'
+
+        if r['est_hours_to_failure'] <= 12:
+            zaman_yorum = f"⛔ {r['est_hours_to_failure']:.1f} saat içinde hata riski ÇOK YÜKSEK"
+        elif r['est_hours_to_failure'] <= 48:
+            zaman_yorum = f"⚠️  ~{r['est_hours_to_failure']:.0f} saat içinde hata bekleniyor"
+        elif r['est_hours_to_failure'] <= 120:
+            zaman_yorum = f"📅 Tahmini {r['est_days_to_failure']:.1f} gün içinde arıza olabilir"
+        else:
+            zaman_yorum = f"✅ Yakın vadede arıza öngörülmüyor (>{r['est_hours_to_failure']:.0f} saat)"
+
+        lines = [
+            f"{'='*60}",
+            f"  ROBOT DURUM RAPORU — {now}",
+            f"  Robot ID : {r['robot_id']}",
+            f"  Risk     : {r['risk_level']}",
+            f"{'='*60}",
+            f"",
+            f"  [HEAD 1] ANLÍK DURUM",
+            f"  ├─ Durum          : {durum}  (P={r['failure_prob_now']:.1%})",
+            f"  ├─ Aktif hatalar  : {hata_str}",
+            f"  └─ Hata kategorisi: {kat_str}",
+            f"",
+            f"  [HEAD 2] ARIZA ŞİDDETİ",
+            f"  ├─ Mevcut şiddet  : {r['severity_now_tr']} ({r['severity_now']})",
+            f"  └─ Dağılım        : {sev_bar}",
+            f"",
+            f"  [HEAD 3] AYLIK TAMİR GEREKSİNİMİ",
+            f"  ├─ Bu ay bakım ihtimali : %{aylik:.1f}",
+            f"  ├─ 7 günlük arıza ihtim.: %{r['next_7d_fail_prob']*100:.1f}",
+            f"  └─ Yorum          : {aylik_yorum}",
+            f"",
+            f"  [HEAD 4] TAHMİNİ ARIZA ZAMANI",
+            f"  └─ {zaman_yorum}",
+            f"",
+            f"{'='*60}",
+        ]
+        return '\n'.join(lines)
+
+    def fleet_report(self, robot_dfs: dict) -> str:
+        """
+        Generate reports for multiple robots.
+
+        Parameters
+        ----------
+        robot_dfs : dict  {robot_id: DataFrame}
+        """
+        reports = []
+        for rid, df in robot_dfs.items():
+            reports.append(self.robot_report(rid, df))
+        return '\n\n'.join(reports)
+
+
+# ── Demo ─────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.WARNING)
 
     engine = LSTMInferenceV2()
 
-    print("\nModel Info:")
-    for k, v in engine.get_model_info().items():
-        print(f"  {k}: {v}")
+    # Örnek: normal robot log satırları (gerçekte HuggingFace'den ya da DB'den gelir)
+    def _make_demo_df(error_level, error_type, error_count, hourly_ratio, n=15):
+        now = pd.Timestamp.now()
+        rows = []
+        for i in range(n):
+            t = now - pd.Timedelta(hours=n - i)
+            rows.append({
+                'task_time':          t,
+                'task_hour':          t.replace(minute=0, second=0),
+                'hourly_error_count': error_count + (i % 3),
+                'hourly_ratio':       hourly_ratio,
+                'robot_id':           'ROBOT_DEMO',
+                'soft_version':       'v3.1.2',
+                'product_code':       'PuduBot2',
+                'error_type':         error_type,
+                'error_level':        error_level,
+            })
+        return pd.DataFrame(rows)
 
-    # Feature order: error_count, task_hour_num, day_of_month, day_of_week,
-    #                robot_id_length, software_version_length,
-    #                product_code_type, hourly_error_rate, error_category
-    normal_seq = np.array([
-        [2,  10, 1, 0, 8, 12, 1, 0.02, 1],
-        [1,   9, 1, 0, 8, 12, 1, 0.01, 1],
-        [3,  11, 1, 0, 8, 12, 1, 0.03, 1],
-        [2,  10, 2, 0, 8, 12, 1, 0.02, 0],
-        [1,   8, 2, 0, 8, 12, 1, 0.01, 0],
-        [2,  12, 2, 0, 8, 12, 1, 0.02, 1],
-        [3,  13, 3, 1, 8, 12, 1, 0.03, 1],
-        [2,  14, 3, 1, 8, 12, 1, 0.02, 0],
-        [1,  15, 3, 1, 8, 12, 1, 0.01, 0],
-        [2,  16, 3, 1, 8, 12, 1, 0.02, 1],
-    ], dtype=np.float32)
+    normal_df  = _make_demo_df('Event',   'NavigationStuck', 2,  0.02)
+    failing_df = _make_demo_df('Fatal',   'WheelErrorLeft',  45, 0.80)
 
-    failing_seq = np.array([
-        [25, 22, 1, 0, 8, 12, 1, 0.45, 3],
-        [30, 23, 1, 0, 8, 12, 1, 0.52, 2],
-        [18, 21, 1, 0, 8, 12, 1, 0.38, 3],
-        [22, 22, 2, 0, 8, 12, 1, 0.41, 2],
-        [35, 23, 2, 0, 8, 12, 1, 0.60, 4],
-        [28, 20, 2, 0, 8, 12, 1, 0.49, 3],
-        [40, 22, 3, 1, 8, 12, 1, 0.70, 2],
-        [45, 23, 3, 1, 8, 12, 1, 0.78, 4],
-        [38, 21, 3, 1, 8, 12, 1, 0.65, 3],
-        [50, 22, 3, 1, 8, 12, 1, 0.85, 2],
-    ], dtype=np.float32)
-
-    for label, seq in [('NORMAL Robot', normal_seq), ('ARIZALI Robot', failing_seq)]:
-        r = engine.predict(seq)
-        print(f"\n── {label} ──────────────────────────────")
-        print(f"  Şu an arızalı?         : {'EVET' if r['is_failure_now'] else 'HAYIR'} "
-              f"(P={r['failure_prob_now']:.4f})")
-        print(f"  Arıza şiddeti          : {r['severity_now_tr']} ({r['severity_now']})")
-        print(f"  7 günlük arıza olasılığı: {r['future_failure_prob']:.4f}")
-        print(f"  Tahmini arızaya kalan  : {r['est_hours_to_failure']:.1f} saat "
-              f"({r['est_days_to_failure']:.1f} gün)")
-        print(f"  Risk seviyesi          : {r['risk_level']}")
+    print(engine.robot_report('ROBOT-NORMAL-01', normal_df))
+    print()
+    print(engine.robot_report('ROBOT-ARIZALI-07', failing_df))

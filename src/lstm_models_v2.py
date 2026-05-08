@@ -141,13 +141,9 @@ class MultiOutputLSTMModel:
                               min_lr=1e-7, verbose=1),
         ]
 
-        # Sample weights based on failure class imbalance (applied to all outputs)
-        sample_weight = None
-        if failure_class_weight is not None:
-            y_f = y_train['is_failure_now']
-            w1  = failure_class_weight.get(1, 1.0)
-            w0  = failure_class_weight.get(0, 1.0)
-            sample_weight = np.where(y_f == 1, w1, w0).astype(np.float32)
+        # Class imbalance handled via loss_weights in compile().
+        # sample_weight dict is not reliably supported across Keras versions
+        # for multi-output models — skip it to avoid KeyError: 0.
 
         self.history = self.model.fit(
             X_train,
@@ -156,7 +152,6 @@ class MultiOutputLSTMModel:
             epochs=epochs,
             batch_size=batch_sz,
             callbacks=callbacks,
-            sample_weight=sample_weight,
             verbose=1,
         )
         return self.history
@@ -223,7 +218,7 @@ class MultiOutputLSTMModel:
         model_dir = Path(model_dir)
         model_dir.mkdir(parents=True, exist_ok=True)
 
-        self.model.save_weights(str(model_dir / 'lstm_v2_weights.h5'))
+        self.model.save_weights(str(model_dir / 'lstm_v2_weights.weights.h5'))
 
         meta = {
             'config':       self.config,
@@ -241,6 +236,6 @@ class MultiOutputLSTMModel:
             meta = json.load(f)
         self.config = meta['config']
         self.build_model(tuple(input_shape), n_severity_classes)
-        self.model.load_weights(str(model_dir / 'lstm_v2_weights.h5'))
+        self.model.load_weights(str(model_dir / 'lstm_v2_weights.weights.h5'))
         logger.info("MultiOutputLSTM_V2 weights loaded.")
         return self.model
