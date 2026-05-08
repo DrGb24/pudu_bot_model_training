@@ -59,7 +59,8 @@ FAILURE_LEVELS = {'Error', 'Fatal', 'Critical'}
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL_DIR = Path('models/lstm_v2')
+DEFAULT_MODEL_DIR   = Path('models/lstm_v2')
+HATA_KODLARI_PATH   = Path(__file__).parent / 'HATA_KODLARI_ROBOT.xlsx'
 
 FEATURE_COLUMNS = [
     'error_count', 'task_hour_num', 'day_of_month', 'day_of_week',
@@ -97,10 +98,64 @@ class LSTMInferenceV2:
         # Load fitted scaler
         self.scaler = joblib.load(model_dir / 'lstm_v2_scaler.pkl')
 
+        # Load error code lookup (HATA_KODLARI_ROBOT.xlsx)
+        self.error_lookup = self._load_error_lookup()
+
         logger.info(
             f"LSTMInferenceV2 ready | input: {self.input_shape} | "
-            f"future window: {self.future_window} h"
+            f"future window: {self.future_window} h | "
+            f"error lookup: {len(self.error_lookup)} codes"
         )
+
+    # ──────────────────────────────────────────────────────────────────────────
+    def _load_error_lookup(self) -> dict:
+        """Read HATA_KODLARI_ROBOT.xlsx → {error_type: {destek_tipi, cozum, sinif}}."""
+        if not HATA_KODLARI_PATH.exists():
+            logger.warning(f"HATA_KODLARI_ROBOT.xlsx bulunamadı: {HATA_KODLARI_PATH}")
+            return {}
+        try:
+            df = pd.read_excel(HATA_KODLARI_PATH)
+            DESTEK_COL = 'Arıza tetikleme değerlendirme koşulları (program koşulları)'
+            COZUM_COL  = 'Çözüm Metodu'
+            SINIF_COL  = 'Arıza sınıflandırması'
+            HATA_COL   = 'Hata Kodları'
+            DETAY_COL  = 'Detay'
+
+            # Forward-fill merged cells
+            df[SINIF_COL] = df[SINIF_COL].ffill()
+            df[HATA_COL]  = df[HATA_COL].ffill()
+
+            def _add_to_lookup(lookup, etype, destek, cozum, sinif):
+                etype = str(etype).strip()
+                if etype in ('nan', '', 'NaN', 'else'):
+                    return
+                destek = str(destek).strip() if pd.notna(destek) else ''
+                cozum  = str(cozum).strip()  if pd.notna(cozum)  else ''
+                sinif  = str(sinif).strip()  if pd.notna(sinif)  else ''
+                if etype not in lookup:
+                    lookup[etype] = {'destek_tipi': destek, 'cozum': cozum, 'sinif': sinif}
+                elif 'Yerinde' in destek:
+                    lookup[etype]['destek_tipi'] = destek
+
+            lookup: dict = {}
+            for _, row in df.iterrows():
+                destek = row[DESTEK_COL]
+                cozum  = row[COZUM_COL]
+                sinif  = row[SINIF_COL]
+
+                # Primary key: Hata Kodları (col 2)
+                if pd.notna(row[HATA_COL]):
+                    _add_to_lookup(lookup, row[HATA_COL], destek, cozum, sinif)
+
+                # Secondary key: Detay (col 3) — sub-error codes also matchable
+                if pd.notna(row[DETAY_COL]):
+                    _add_to_lookup(lookup, row[DETAY_COL], destek, cozum, sinif)
+
+            logger.info(f"Hata kodu tablosu yüklendi: {len(lookup)} kayıt")
+            return lookup
+        except Exception as exc:
+            logger.warning(f"Hata kodu tablosu yüklenemedi: {exc}")
+            return {}
 
     # ──────────────────────────────────────────────────────────────────────────
     def predict(self, sequence: np.ndarray) -> dict:
@@ -351,6 +406,21 @@ class LSTMInferenceV2:
 
         risk = self._risk_level(p_now, p_future_max)
 
+        # ── Hata kodu lookup (Excel) ─────────────────────────────────────────
+        error_details = []
+        seen = set()
+        for etype in active_errors:
+            if etype in seen:
+                continue
+            seen.add(etype)
+            info = self.error_lookup.get(etype, {})
+            error_details.append({
+                'hata_kodu':   etype,
+                'destek_tipi': info.get('destek_tipi', 'Bilinmiyor'),
+                'cozum':       info.get('cozum', ''),
+                'sinif':       info.get('sinif', ''),
+            })
+
         return {
             'robot_id': robot_id,
             'reference_date': str(reference_date.date()),
@@ -359,6 +429,7 @@ class LSTMInferenceV2:
             'failure_prob_now':  round(p_now, 4),
             'active_error_types': active_errors,
             'active_error_categories': active_cats,
+            'error_details': error_details,
             # Head 2
             'severity_now':      sev_label,
             'severity_now_tr':   sev_tr,
@@ -420,6 +491,34 @@ class LSTMInferenceV2:
             f"  ├─ Aktif hatalar  : {hata_str}",
             f"  └─ Hata kategorisi: {kat_str}",
             f"",
+        ]
+
+        # ── HATA DETAYLARI (Excel lookup) ────────────────────────────────────
+        details = r.get('error_details', [])
+        if details:
+            lines.append(f"  [HATA DETAYLARI]")
+            for i, d in enumerate(details):
+                prefix = '  ├─' if i < len(details) - 1 else '  └─'
+                destek_icon = '🔧' if 'Yerinde' in d['destek_tipi'] else '📞'
+                lines.append(f"  │")
+                lines.append(f"  ├─ Hata Kodu   : {d['hata_kodu']}")
+                if d['sinif']:
+                    lines.append(f"  │  Sınıf       : {d['sinif']}")
+                lines.append(f"  │  Destek Tipi : {destek_icon} {d['destek_tipi']}")
+                if d['cozum']:
+                    # Wrap long solution text at 65 chars
+                    cozum = d['cozum']
+                    if len(cozum) > 65:
+                        lines.append(f"  │  Çözüm       : {cozum[:65]}…")
+                        lines.append(f"  │               {cozum[65:130]}")
+                    else:
+                        lines.append(f"  │  Çözüm       : {cozum}")
+            lines.append(f"  │")
+            lines.append(f"")
+        else:
+            lines.append(f"")
+
+        lines += [
             f"  [HEAD 2] ARIZA ŞİDDETİ",
             f"  ├─ Mevcut şiddet  : {r['severity_now_tr']} ({r['severity_now']})",
             f"  └─ Dağılım        : {sev_bar}",
