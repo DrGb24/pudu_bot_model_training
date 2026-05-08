@@ -227,7 +227,16 @@ class LSTMTrainerV2:
 
     # ── Step 4: Sequence creation ─────────────────────────────────────────────
     def create_sequences(self, df):
-        """Sliding-window sequences → (X, y_dict) where y uses last-step labels."""
+        """
+        Sliding-window sequences → (X, y_dict).
+
+        Label is taken from the step AFTER the sequence (t+1), not the last step
+        of the sequence (t).  This avoids leakage: features at step t (e.g.
+        error_count, error_category) are correlated with is_failure_now at t
+        because both come from the same raw log row.  Shifting the label one
+        step forward means the model must genuinely predict the next state from
+        prior observations only.
+        """
         for col in FEATURE_COLUMNS:
             if col not in df.columns:
                 logger.warning(f"  Feature '{col}' missing → filled with 0")
@@ -236,9 +245,10 @@ class LSTMTrainerV2:
         X, y_failure, y_severity, y_future, y_time = [], [], [], [], []
 
         n = len(df)
-        for i in range(n - SEQUENCE_LEN + 1):
-            seq = df[FEATURE_COLUMNS].iloc[i: i + SEQUENCE_LEN].values
-            last = i + SEQUENCE_LEN - 1
+        # Range stops one earlier so label index (i + SEQUENCE_LEN) stays in bounds
+        for i in range(n - SEQUENCE_LEN):
+            seq  = df[FEATURE_COLUMNS].iloc[i: i + SEQUENCE_LEN].values
+            last = i + SEQUENCE_LEN          # next-step label (t+1, not in seq)
             X.append(seq)
             y_failure.append(df['is_failure_now'].iloc[last])
             y_severity.append(df['severity_class'].iloc[last])

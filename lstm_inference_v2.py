@@ -309,7 +309,14 @@ class LSTMInferenceV2:
         return df
 
     def _make_sequences(self, df: pd.DataFrame):
-        """Sliding window → (sequences array, last-step raw rows)."""
+        """
+        Sliding window → (sequences array, reference rows for context display).
+
+        Each sequence covers steps [i : i+seq_len].  Matching the training fix,
+        the model predicts the state at step i+seq_len (the next step beyond the
+        sequence), so we use the LAST row of the sequence as the contextual
+        reference (last known observation), not as the label source.
+        """
         seq_len = self.input_shape[0]
         n = len(df)
         if n < seq_len:
@@ -322,6 +329,7 @@ class LSTMInferenceV2:
                 df[FEATURE_COLUMNS].values[i: i + seq_len]
                 for i in range(n - seq_len + 1)
             ])
+            # last row of each window = last known observation
             last_rows = [df.iloc[i + seq_len - 1] for i in range(n - seq_len + 1)]
         return X.astype(np.float32), last_rows
 
