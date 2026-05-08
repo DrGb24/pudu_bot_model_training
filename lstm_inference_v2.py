@@ -454,7 +454,19 @@ class LSTMInferenceV2:
         r   = self.predict_for_robot(robot_id, robot_df, reference_date)
         now = r['reference_date']  # T-1 tarihi
 
-        durum    = 'ARIZALI ⚠️' if r['is_failure_now'] else 'NORMAL ✓'
+        sev       = r['severity_score']   # 0=Event 1=Warning 2=Error 3=Fatal
+        p_now_val = r['failure_prob_now']
+        has_errs  = bool(r['active_error_types'])
+
+        if sev == 3 or (sev == 2 and p_now_val >= 0.80):
+            durum = 'ARIZALI ⛔'
+        elif sev == 2 or (p_now_val >= 0.55 and has_errs):
+            durum = 'BAKIM GEREKTİRİYOR ⚠️'
+        elif sev == 1 or (p_now_val >= 0.30 and has_errs):
+            durum = 'TAKİPTE 🔶'
+        else:
+            durum = 'ÇALIŞIR DURUMDA ✓'
+
         hata_str = ', '.join(r['active_error_types']) if r['active_error_types'] else 'Yok'
         kat_str  = ', '.join(r['active_error_categories']) if r['active_error_categories'] else 'Yok'
 
@@ -479,15 +491,19 @@ class LSTMInferenceV2:
         else:
             zaman_yorum = f"✅ Yakın vadede arıza öngörülmüyor (>{r['est_hours_to_failure']:.0f} saat)"
 
+        risk_labels = {'YUKSEK': 'YÜKSEK 🔴', 'ORTA': 'ORTA 🟡', 'DUSUK': 'DÜŞÜK 🟢'}
+        risk_str    = risk_labels.get(r['risk_level'], r['risk_level'])
+
         lines = [
             f"{'='*60}",
             f"  ROBOT DURUM RAPORU — T-1: {now}",
             f"  Robot ID : {r['robot_id']}",
-            f"  Risk     : {r['risk_level']}",
+            f"  Genel Risk : {risk_str}",
             f"{'='*60}",
             f"",
-            f"  [HEAD 1] ANLÍK DURUM  (T-1 gününe ait son log)",
-            f"  ├─ Durum          : {durum}  (P={r['failure_prob_now']:.1%})",
+            f"  [1] ANLÍK DURUM  (T-1 gününe ait son log)",
+            f"  ├─ Durum          : {durum}",
+            f"  ├─ Arıza olasılığı: %{r['failure_prob_now']*100:.1f}",
             f"  ├─ Aktif hatalar  : {hata_str}",
             f"  └─ Hata kategorisi: {kat_str}",
             f"",
@@ -519,20 +535,16 @@ class LSTMInferenceV2:
             lines.append(f"")
 
         lines += [
-            f"  [HEAD 2] ARIZA ŞİDDETİ",
+            f"  [2] ARIZA ŞİDDETİ",
             f"  ├─ Mevcut şiddet  : {r['severity_now_tr']} ({r['severity_now']})",
             f"  └─ Dağılım        : {sev_bar}",
             f"",
-            f"  [HEAD 3] TAMİR / BAKIM GEREKSİNİMİ",
+            f"  [3] BAKIM / TAMİR GEREKSİNİMİ",
             f"  ├─ 7 günlük arıza ihtim.: %{r['next_7d_fail_prob']*100:.1f}",
             f"  ├─ Maksimum pencere iht.: %{aylik:.1f}",
-            f"  ├─ Yorum          : {aylik_yorum}",
-            f"  └─ Karar dayanağı : LSTM V2 Head-3 (168 saatlik öngörü penceresi)",
-            f"                     Eşikler → ≥%70 YÜKSEK | ≥%40 ORTA | <%40 DÜŞÜK",
-            f"                     Model eğitim verisi: HuggingFace pudu-robot-operation-logs",
-            f"                     (train: 103.241 kayıt, 46 robot, error_level=Error/Fatal)",
+            f"  └─ {aylik_yorum}",
             f"",
-            f"  [HEAD 4] TAHMİNİ ARIZA ZAMANI (T-1'den itibaren)",
+            f"  [4] TAHMİNİ ARIZA ZAMANI (T-1'den itibaren)",
             f"  └─ {zaman_yorum}",
             f"",
             f"{'='*60}",
