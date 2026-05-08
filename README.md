@@ -5,7 +5,7 @@
 [![HuggingFace Dataset](https://img.shields.io/badge/Dataset-HuggingFace-yellow.svg)](https://huggingface.co/datasets/Lightcap/pudu-robot-operation-logs-bau-capstone-2026)
 
 PUDU servis robotları için çok çıktılı LSTM tabanlı prediktif bakım sistemi.
-**103.241 gerçek robot hata logu** ile eğitilmiş; anlık durum, arıza şiddeti, 7 günlük öngörü ve tahmini arıza süresi çıktıları üretir.
+**147.488 gerçek robot hata logu** ile eğitilmiş; anlık durum, arıza şiddeti, 7 günlük öngörü ve tahmini arıza süresi çıktıları üretir.
 
 ---
 
