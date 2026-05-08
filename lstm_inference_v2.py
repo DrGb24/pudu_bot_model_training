@@ -258,8 +258,8 @@ class LSTMInferenceV2:
         seq_len = self.input_shape[0]
         n = len(df)
         if n < seq_len:
-            # Pad with first row if not enough data
-            pad = pd.concat([df.iloc[[0]] * (seq_len - n), df], ignore_index=True)
+            pad_rows = seq_len - n
+            pad = pd.concat([df.iloc[[0]]] * pad_rows + [df], ignore_index=True)
             X = pad[FEATURE_COLUMNS].values[np.newaxis, ...]
             last_rows = [df.iloc[-1]]
         else:
@@ -270,22 +270,45 @@ class LSTMInferenceV2:
             last_rows = [df.iloc[i + seq_len - 1] for i in range(n - seq_len + 1)]
         return X.astype(np.float32), last_rows
 
-    def predict_for_robot(self, robot_id: str, robot_df: pd.DataFrame) -> dict:
+    def predict_for_robot(self, robot_id: str, robot_df: pd.DataFrame,
+                           reference_date: pd.Timestamp = None) -> dict:
         """
         Given a robot's log DataFrame, return aggregated predictions.
 
         Parameters
         ----------
-        robot_id  : str — robot identifier (for reporting)
-        robot_df  : pd.DataFrame — raw log rows for this robot
-                    Must contain: task_time, task_hour, hourly_error_count,
-                    hourly_ratio, robot_id, soft_version, product_code,
-                    error_type, error_level
+        robot_id       : str
+        robot_df       : pd.DataFrame — raw log rows for this robot
+        reference_date : T-1 cutoff. Only rows <= reference_date are used.
+                         If None, uses (max date in robot_df) - 1 day.
 
         Returns
         -------
         dict with per-robot aggregated predictions
         """
+        robot_df = robot_df.copy()
+        robot_df['task_time'] = pd.to_datetime(robot_df['task_time'])
+
+        # ── T-1 cutoff ────────────────────────────────────────────────────
+        if reference_date is None:
+            reference_date = robot_df['task_time'].max().normalize() - pd.Timedelta(days=1)
+        # Keep only data up to end of reference_date (T-1 full day)
+        cutoff = reference_date + pd.Timedelta(days=1) - pd.Timedelta(seconds=1)
+        robot_df = robot_df[robot_df['task_time'] <= cutoff]
+        if robot_df.empty:
+            # No data before T-1 → return safe defaults
+            return {
+                'robot_id': robot_id, 'reference_date': str(reference_date.date()),
+                'is_failure_now': False, 'failure_prob_now': 0.0,
+                'active_error_types': [], 'active_error_categories': [],
+                'severity_now': 'Event', 'severity_now_tr': 'Bilgi',
+                'severity_score': 0, 'severity_probs': {k: 0.0 for k in SEVERITY_LABELS.values()},
+                'monthly_repair_prob': 0.0, 'next_7d_fail_prob': 0.0,
+                'est_hours_to_failure': self.future_window,
+                'est_days_to_failure': self.future_window / 24,
+                'risk_level': 'DUSUK',
+            }
+
         df = self._engineer_robot_features(robot_df)
         X, last_rows = self._make_sequences(df)
 
@@ -330,6 +353,7 @@ class LSTMInferenceV2:
 
         return {
             'robot_id': robot_id,
+            'reference_date': str(reference_date.date()),
             # Head 1
             'is_failure_now':    is_fail,
             'failure_prob_now':  round(p_now, 4),
@@ -350,12 +374,14 @@ class LSTMInferenceV2:
             'risk_level': risk,
         }
 
-    def robot_report(self, robot_id: str, robot_df: pd.DataFrame) -> str:
+    def robot_report(self, robot_id: str, robot_df: pd.DataFrame,
+                      reference_date: pd.Timestamp = None) -> str:
         """
         Generate a human-readable Turkish report for a single robot.
+        reference_date: T-1 cutoff (uses max date - 1 day if None)
         """
-        r   = self.predict_for_robot(robot_id, robot_df)
-        now = datetime.now().strftime('%Y-%m-%d %H:%M')
+        r   = self.predict_for_robot(robot_id, robot_df, reference_date)
+        now = r['reference_date']  # T-1 tarihi
 
         durum    = 'ARIZALI ⚠️' if r['is_failure_now'] else 'NORMAL ✓'
         hata_str = ', '.join(r['active_error_types']) if r['active_error_types'] else 'Yok'
@@ -384,12 +410,12 @@ class LSTMInferenceV2:
 
         lines = [
             f"{'='*60}",
-            f"  ROBOT DURUM RAPORU — {now}",
+            f"  ROBOT DURUM RAPORU — T-1: {now}",
             f"  Robot ID : {r['robot_id']}",
             f"  Risk     : {r['risk_level']}",
             f"{'='*60}",
             f"",
-            f"  [HEAD 1] ANLÍK DURUM",
+            f"  [HEAD 1] ANLÍK DURUM  (T-1 gününe ait son log)",
             f"  ├─ Durum          : {durum}  (P={r['failure_prob_now']:.1%})",
             f"  ├─ Aktif hatalar  : {hata_str}",
             f"  └─ Hata kategorisi: {kat_str}",
@@ -398,60 +424,70 @@ class LSTMInferenceV2:
             f"  ├─ Mevcut şiddet  : {r['severity_now_tr']} ({r['severity_now']})",
             f"  └─ Dağılım        : {sev_bar}",
             f"",
-            f"  [HEAD 3] AYLIK TAMİR GEREKSİNİMİ",
-            f"  ├─ Bu ay bakım ihtimali : %{aylik:.1f}",
+            f"  [HEAD 3] TAMİR / BAKIM GEREKSİNİMİ",
             f"  ├─ 7 günlük arıza ihtim.: %{r['next_7d_fail_prob']*100:.1f}",
-            f"  └─ Yorum          : {aylik_yorum}",
+            f"  ├─ Maksimum pencere iht.: %{aylik:.1f}",
+            f"  ├─ Yorum          : {aylik_yorum}",
+            f"  └─ Karar dayanağı : LSTM V2 Head-3 (168 saatlik öngörü penceresi)",
+            f"                     Eşikler → ≥%70 YÜKSEK | ≥%40 ORTA | <%40 DÜŞÜK",
+            f"                     Model eğitim verisi: HuggingFace pudu-robot-operation-logs",
+            f"                     (train: 103.241 kayıt, 46 robot, error_level=Error/Fatal)",
             f"",
-            f"  [HEAD 4] TAHMİNİ ARIZA ZAMANI",
+            f"  [HEAD 4] TAHMİNİ ARIZA ZAMANI (T-1'den itibaren)",
             f"  └─ {zaman_yorum}",
             f"",
             f"{'='*60}",
         ]
         return '\n'.join(lines)
 
-    def fleet_report(self, robot_dfs: dict) -> str:
+    def fleet_report(self, robot_dfs: dict,
+                     reference_date: pd.Timestamp = None) -> str:
         """
         Generate reports for multiple robots.
 
         Parameters
         ----------
-        robot_dfs : dict  {robot_id: DataFrame}
+        robot_dfs      : dict  {robot_id: DataFrame}
+        reference_date : shared T-1 cutoff for all robots
         """
         reports = []
         for rid, df in robot_dfs.items():
-            reports.append(self.robot_report(rid, df))
+            reports.append(self.robot_report(rid, df, reference_date))
         return '\n\n'.join(reports)
 
 
 # ── Demo ─────────────────────────────────────────────────────────────────────
 if __name__ == '__main__':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     logging.basicConfig(level=logging.WARNING)
+
+    from datasets import load_dataset
+
+    print("HuggingFace'den veri yükleniyor...")
+    ds = load_dataset(
+        'Lightcap/pudu-robot-operation-logs-bau-capstone-2026',
+        'partitioned_error_logs',
+        split='train',
+    )
+    df = ds.to_pandas()
+    print(f"Toplam kayıt: {len(df):,} | Toplam robot: {df['robot_id'].nunique()}")
 
     engine = LSTMInferenceV2()
 
-    # Örnek: normal robot log satırları (gerçekte HuggingFace'den ya da DB'den gelir)
-    def _make_demo_df(error_level, error_type, error_count, hourly_ratio, n=15):
-        now = pd.Timestamp.now()
-        rows = []
-        for i in range(n):
-            t = now - pd.Timedelta(hours=n - i)
-            rows.append({
-                'task_time':          t,
-                'task_hour':          t.replace(minute=0, second=0),
-                'hourly_error_count': error_count + (i % 3),
-                'hourly_ratio':       hourly_ratio,
-                'robot_id':           'ROBOT_DEMO',
-                'soft_version':       'v3.1.2',
-                'product_code':       'PuduBot2',
-                'error_type':         error_type,
-                'error_level':        error_level,
-            })
-        return pd.DataFrame(rows)
+    # ── T-1: veri setindeki en güncel tarih - 1 gün ──────────────────────
+    df['task_time'] = pd.to_datetime(df['task_time'])
+    max_date        = df['task_time'].max().normalize()
+    t1_date         = max_date - pd.Timedelta(days=1)  # T-1
 
-    normal_df  = _make_demo_df('Event',   'NavigationStuck', 2,  0.02)
-    failing_df = _make_demo_df('Fatal',   'WheelErrorLeft',  45, 0.80)
+    robot_groups = {rid: rdf for rid, rdf in df.groupby('robot_id')}
+    print(f"\n{'='*60}")
+    print(f"  FİLO RAPORU")
+    print(f"  Veri son tarihi (T)  : {max_date.date()}")
+    print(f"  Analiz tarihi  (T-1) : {t1_date.date()}")
+    print(f"  Toplam {len(robot_groups)} robot analiz ediliyor...")
+    print(f"{'='*60}\n")
 
-    print(engine.robot_report('ROBOT-NORMAL-01', normal_df))
-    print()
-    print(engine.robot_report('ROBOT-ARIZALI-07', failing_df))
+    for robot_id, robot_df in robot_groups.items():
+        print(engine.robot_report(robot_id, robot_df, reference_date=t1_date))
+        print()
