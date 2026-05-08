@@ -52,7 +52,7 @@ project/
 | **Toplam** | **147.488** | |
 
 - Giriş: 10 adımlı zaman serisi, 9 özellik
-- Bölünme: %80 eğitim / %20 test
+- Bölünme: %75 Training / %15 Validation / %15 Test
 
 **Eğitim Sonuçları:**
 
