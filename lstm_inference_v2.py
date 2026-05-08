@@ -549,7 +549,7 @@ class LSTMInferenceV2:
             f"",
             f"  [3] BAKIM / TAMİR GEREKSİNİMİ",
             f"  ├─ 7 günlük arıza ihtim.: %{r['next_7d_fail_prob']*100:.1f}",
-            f"  ├─ Maksimum pencere iht.: %{aylik:.1f}",
+            f"  ├─ En yüksek risk anı   : %{aylik:.1f}",
             f"  └─ {aylik_yorum}",
             f"",
             f"  [4] TAHMİNİ ARIZA ZAMANI (T-1'den itibaren)",

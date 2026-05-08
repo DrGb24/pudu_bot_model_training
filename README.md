@@ -156,7 +156,7 @@ fleet = engine.fleet_report(robot_dfs={'id1': df1, 'id2': df2})
 
   [3] BAKIM / TAMİR GEREKSİNİMİ
   ├─ 7 günlük arıza ihtim.: %82.7
-  ├─ Maksimum pencere iht.: %95.1
+  ├─ En yüksek risk anı   : %95.1
   └─ YÜKSEK ihtimalle bakım gerekecek
 
   [4] TAHMİNİ ARIZA ZAMANI (T-1'den itibaren)
