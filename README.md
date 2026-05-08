@@ -42,7 +42,15 @@ project/
 
 **Eğitim Verisi:**
 - Kaynak: `Lightcap/pudu-robot-operation-logs-bau-capstone-2026` (HuggingFace)
-- Config: `partitioned_error_logs` — 103.241 satır, 46 robot
+- Config: `partitioned_error_logs` — **toplam 147.488 kayıt**, 46 robot
+
+| Split | Satır | Kullanım |
+|---|---|---|
+| `train` | 103.241 | Model eğitimi |
+| `validation` | 22.123 | Erken durdurma / hiperparametre |
+| `test` | 22.124 | Final değerlendirme |
+| **Toplam** | **147.488** | |
+
 - Giriş: 10 adımlı zaman serisi, 9 özellik
 - Bölünme: %80 eğitim / %20 test
 
